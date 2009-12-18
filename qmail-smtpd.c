@@ -6,6 +6,7 @@
 #include "subfd.h"
 #include "alloc.h"
 #include "auto_qmail.h"
+#include "auto_break.h"
 #include "control.h"
 #include "received.h"
 #include "constmap.h"
@@ -28,6 +29,7 @@
 #include "commands.h"
 #include "dns.h"
 #include "smtpcall.h"
+#include "qmail-ldap.h"
 #include "limit.h"
 #ifdef SMTPEXECCHECK
 #include "execcheck.h"
@@ -162,7 +164,7 @@ void straynewline(void) { out("451 See http://pobox.com/~djb/docs/smtplf.html.\r
 void oversizedline(void) { out("500 Text line too long."); logline(1,"Oversized line in data part, closing connection"); flush(); _exit(1); }
 void err_qqt(void) { out("451 qqt failure (#4.3.0)\r\n"); }
 void err_dns(void) { out("421 DNS temporary failure at return MX check, try again later (#4.3.0)\r\n"); }
-void err_ldapsoft(void) { out("451 temporary ldap lookup failure, try again later\r\n"); logline(1,"temporary ldap lookup failure"); }
+void err_soft(char *s) { out("451 "); out(s); out("\r\n"); logline2(1,"temporary verify error: ", s); }
 void err_bmf(void) { out("553 sorry, your mail was administratively denied. (#5.7.1)\r\n"); }
 void err_bmfunknown(void) { out("553 sorry, your mail from a host ["); out(remoteip); out("] without valid reverse DNS was administratively denied (#5.7.1)\r\n"); }
 void err_maxrcpt(void) { out("553 sorry, too many recipients (#5.7.1)\r\n"); }
@@ -184,7 +186,7 @@ void err_badrcptto(void) { out("553 sorry, mail to that recipient is not accepte
 void err_554msg(const char *arg)
 {
 	out("554 "); out(arg); out("\r\n");
-	logline2(3,"message denied because: ",arg);
+	logline2(3,"message denied: ",arg);
 }
 
 
@@ -707,16 +709,53 @@ int rcptdenied(void)
   return 0;
 }
 
+stralloc gmaddr;
+
 int goodmailaddr(void)
 {
-  unsigned int j;
+  unsigned int at;
+#ifdef DASH_EXT
+  unsigned int ext;
+  int extcnt;
+#endif
 
   if (!gmaok) return 0;
   if (constmap(&mapgma, addr.s, addr.len - 1)) return 1;
-  j = byte_rchr(addr.s,addr.len,'@');
-  if (j < addr.len)
-    if (constmap(&mapgma, addr.s + j, addr.len - j - 1))
+  at = byte_rchr(addr.s,addr.len,'@');
+  if (at < addr.len) {
+    if (constmap(&mapgma, addr.s + at, addr.len - at - 1))
       return 1;
+    if (constmap(&mapgma, addr.s, at + 1))
+      return 1;
+#ifdef DASH_EXT
+    /* foo-catchall@domain.org */
+    for (ext = 0, extcnt = 1; ext < at && extcnt <= DASH_EXT_LEVELS; ext++)
+      if (addr.s[ext] == *auto_break)
+	extcnt++;
+    for (;;) {
+      if (addr.s[ext] == *auto_break) {
+	if (!stralloc_copyb(&gmaddr, addr.s, ext + 1))
+	  die_nomem();
+	if (!stralloc_cats(&gmaddr, LDAP_CATCH_ALL))
+	  die_nomem();
+	if (!stralloc_catb(&gmaddr, addr.s + at, addr.len - at - 1))
+	  die_nomem();
+	if (constmap(&mapgma, gmaddr.s, gmaddr.len))
+	  return 1;
+      }
+      if (ext == 0)
+	break;
+      ext--;
+    }
+#endif
+    /* catchall@domain.org */
+    if (!stralloc_copys(&gmaddr, LDAP_CATCH_ALL))
+      die_nomem();
+    if (!stralloc_catb(&gmaddr, addr.s + at, addr.len - at - 1))
+      die_nomem();
+    if (constmap(&mapgma, gmaddr.s, gmaddr.len))
+      return 1;
+  }
   return 0;
 }
 
@@ -760,8 +799,18 @@ int ldaplookup(char *address, char **s)
 	return 0;
       }
     }
-    /* FALLTHROUGH */
+    break;
   case 'Z':
+    /* soft error */
+    if (!stralloc_copys(&verifyresponse, "")) die_nomem();
+    while (call_getc(&ccverify, &ch) == 1) {
+      if (!stralloc_append(&verifyresponse, &ch)) die_nomem();
+      if (ch == 0) {
+	*s = verifyresponse.s;
+	return -1;
+      }
+    }
+    break;
   default:
     break;
   }
@@ -819,6 +868,8 @@ void smtp_ehlo(char *arg)
 void smtp_rset(char *arg)
 {
   seenmail = 0;
+  if (relayclient != NULL && relayok == NULL)
+	  env_unset("RELAYCLIENT");
   relayclient = relayok; /* restore original relayclient setting */
   out("250 flushed\r\n");
   logline(4,"remote rset");
@@ -841,7 +892,7 @@ void smtp_mail(char *arg)
     return;
   }
 
-  logline2(3,"mail from: ",addr.s);
+  logline2(4,"mail from: ",addr.s);
 
   if (needauth && !flagauthok) {
     out("530 authentication needed\r\n");
@@ -851,8 +902,10 @@ void smtp_mail(char *arg)
   }
 
   /* check if we are authenticated, if yes enable relaying */
-  if (flagauthok && relayclient == 0)
+  if (flagauthok && relayclient == 0) {
     relayclient = "";
+    if (!env_put("RELAYCLIENT=")) die_nomem();
+  }
 
   /* smtp size check */
   if (databytes && !sizelimit(arg))
@@ -908,8 +961,7 @@ void smtp_mail(char *arg)
       return;
     }
     /* No '.' in domain.TLD */
-    if ((j = byte_rchr(addr.s+i, addr.len-i, '.')) >= addr.len-i)
-    {
+    if ((j = byte_rchr(addr.s+i, addr.len-i, '.')) >= addr.len-i) {
       err_554msg("mailfrom without . in domain part is "
         "administratively denied");
       if (errdisconnect) err_quit();
@@ -934,6 +986,7 @@ void smtp_mail(char *arg)
   if (!relayclient) {
     if (rmfcheck()) {
       relayclient = "";
+      if (!env_put("RELAYCLIENT=")) die_nomem();
       logline(4,"relaying allowed via relaymailfrom");
     }
   }
@@ -986,12 +1039,16 @@ void smtp_mail(char *arg)
   /* check if sender exists in ldap */
   if (sendercheck && !bounceflag) {
     if (!goodmailaddr()) { /* good mail addrs go through anyway */
+      logline(4,"sender verify, sender not in goodmailaddr");
       if (addrlocals()) {
 	char *s;
+	logline(4,"sender verify, sender is local");
         switch (ldaplookup(addr.s, &s)) {
           case 1: /* valid */
+	    logline(4,"sender verify OK");
             break;
           case 0: /* invalid */
+	    logline2(2, "bad sender: ", addr.s);
             err_554msg(s);
             if (errdisconnect) err_quit();
             return;
@@ -999,22 +1056,16 @@ void smtp_mail(char *arg)
           default: /* other error, treat as soft 4xx */
             if (ldapsoftok)
               break;
-            err_ldapsoft();
+            err_soft(s);
             if (errdisconnect) err_quit();
             return;
         }
       } else {
         /* not in addrlocals, ldap lookup is useless */
         /* normal mode: let through, it's just an external mail coming in */
-        /* loose mode: see if sender is in rcpthosts, if no reject here */
-        if (sendercheck == 2 && !addrallowed()) {
-          err_554msg("refused mailfrom because valid "
-            "local sender address required");
-          if (errdisconnect) err_quit();
-          return;
-        }
-        /* strict mode: we require validated sender so reject here right out */
-        if (sendercheck == 3) {
+        /* loose mode (2): see if sender is in rcpthosts, if no reject here */
+        /* strict mode (3): validated sender required so reject in any case */
+        if ((sendercheck == 2 && !addrallowed()) || sendercheck == 3) {
           err_554msg("refused mailfrom because valid "
             "local sender address required");
           if (errdisconnect) err_quit();
@@ -1029,7 +1080,7 @@ void smtp_mail(char *arg)
   if (!stralloc_copys(&mailfrom,addr.s)) die_nomem();
   if (!stralloc_0(&mailfrom)) die_nomem();
   rcptcount = 0;
-  if (loglevel == 2)
+  if (loglevel < 4)
     logline2(2,"mail from: ",mailfrom.s);
   out("250 ok\r\n");
 }
@@ -1052,25 +1103,21 @@ void smtp_rcpt(char *arg)
     return;
   }
 
-  logline2(3,"rcpt to: ",addr.s);
+  logline2(4,"rcpt to: ",addr.s);
 
   /* block stupid and bogus sendwhale bug relay probing */
-  if (blockrelayprobe) /* don't enable this if you use percenthack */
-  {
-    if (relayprobe())
-    {
-      err_relay();
-      logline(3,"'rcpt to' denied, looks like bogus sendwhale bug relay probe");
-      if (errdisconnect) err_quit();
-      return;
-    }
+  /* don't enable this if you use percenthack */
+  if (blockrelayprobe && relayprobe()) {
+    err_relay();
+    logline(3,"'rcpt to' denied, looks like bogus sendwhale bug relay probe");
+    if (errdisconnect) err_quit();
+    return;
   }
 
   /* do we block this recipient */
-  if (rcptdenied())
-  {
+  if (rcptdenied()) {
     err_badrcptto();
-    logline2(3,"'rcpt to' denied: ",arg);
+    logline2(3,"'rcpt to' denied via badrcptto: ",addr.s);
     if (errdisconnect) err_quit();
     return;
   }
@@ -1081,10 +1128,9 @@ void smtp_rcpt(char *arg)
     if (!stralloc_cats(&addr,relayclient)) die_nomem();
     if (!stralloc_0(&addr)) die_nomem();
   } else {
-    if (!addrallowed())
-    { 
+    if (!addrallowed()) { 
       err_nogateway();
-      logline2(3,"no mail relay for 'rcpt to': ",arg);
+      logline2(3,"no mail relay for 'rcpt to': ",addr.s);
       if (errdisconnect) err_quit();
       return; 
     }
@@ -1092,8 +1138,7 @@ void smtp_rcpt(char *arg)
   ++rcptcount;
 
   /* maximum recipient limit reached */
-  if (maxrcptcount && rcptcount > maxrcptcount)
-  {
+  if (maxrcptcount && rcptcount > maxrcptcount) {
     err_maxrcpt();
     logline(3,"message denied because of more 'RCPT TO' than "
       "allowed by MAXRCPTCOUNT");
@@ -1102,8 +1147,7 @@ void smtp_rcpt(char *arg)
   }
 
   /* only one recipient for bounce messages */
-  if (rcptcount > 1 && (!mailfrom.s[0] || !str_diff("#@[]", mailfrom.s)))
-  {
+  if (rcptcount > 1 && (!mailfrom.s[0] || !str_diff("#@[]", mailfrom.s))) {
     err_badbounce();
     logline(3,"bounce message denied because it has more than one recipient");
     if (errdisconnect) err_quit();
@@ -1122,7 +1166,7 @@ void smtp_rcpt(char *arg)
 	    logline(4,"recipient verify OK");
             break;
           case 0: /* invalid */
-	    logline(3,"message denied because of recipient verify");
+	    logline2(2, "bad recipient: ", addr.s);
             err_554msg(s);
             if (errdisconnect) err_quit();
             return;
@@ -1130,8 +1174,7 @@ void smtp_rcpt(char *arg)
           default: /* other error, treat as soft 4xx */
             if (ldapsoftok)
               break;
-	    logline(3,"recipient verify soft error");
-            err_ldapsoft();
+            err_soft(s);
             if (errdisconnect) err_quit();
             return;
         }
@@ -1139,14 +1182,13 @@ void smtp_rcpt(char *arg)
     }
   }
 
-  if (loglevel == 2)
+  if (loglevel < 4)
     logline2(2,"rcpt to: ",addr.s);
   if (!stralloc_cats(&rcptto,"T")) die_nomem();
   if (!stralloc_cats(&rcptto,addr.s)) die_nomem();
   if (!stralloc_0(&rcptto)) die_nomem();
-  if (tarpitcount && tarpitdelay && rcptcount >= tarpitcount)
-  {
-    logline(4,"tarpitting");
+  if (tarpitcount && tarpitdelay && rcptcount >= tarpitcount) {
+    logline(3,"tarpitting");
     while (sleep(tarpitdelay));
   }
   out("250 ok\r\n");

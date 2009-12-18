@@ -31,15 +31,25 @@
  * SUCH DAMAGE.
  *
  */
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <pwd.h>
 #include <unistd.h>
+#include "auto_break.h"
+#include "byte.h"
+#include "case.h"
+#include "cdb.h"
 #include "error.h"
 #include "getln.h"
+#include "localdelivery.h"
+#include "open.h"
 #include "output.h"
 #include "qldap.h"
 #include "qldap-debug.h"
 #include "qldap-errno.h"
 #include "qmail-ldap.h"
 #include "read-ctrl.h"
+#include "str.h"
 #include "stralloc.h"
 #include "subfd.h"
 #include "substdio.h"
@@ -64,6 +74,10 @@ void
 die_nomem(void)
 {
 	cleanup();
+	if (substdio_puts(subfdout, "ZOut of memory in qmail-verify.") == -1)
+		die_write();
+	if (substdio_putflush(subfdout, "", 1) == -1)
+		die_write();
 	_exit(111);
 }
 void
@@ -91,10 +105,44 @@ temp_fail(void)
 	qldap_free_results(q);
 }
 
-void lookup(stralloc *mail);
+int
+temp_sys(void)
+{
+	if (substdio_puts(subfdout,
+	    "ZTemporary failure in qmail-verify.") == -1)
+		die_write();
+	if (substdio_putflush(subfdout, "", 1) == -1)
+		die_write();
+	return -1;
+}
+
+int
+temp_nfs(void)
+{
+	if (substdio_puts(subfdout, "ZNFS failure in qmail-verify.") == -1)
+		die_write();
+	if (substdio_putflush(subfdout, "", 1) == -1)
+		die_write();
+	return -1;
+}
+
+void
+die_cdb(void)
+{
+	if (substdio_puts(subfdout,
+	    "ZTrouble reading users/cdb in qmail-verify.") == -1)
+		die_write();
+	if (substdio_putflush(subfdout, "", 1) == -1)
+		die_write();
+	_exit(111);
+}
+
+int lookup(stralloc *);
+int lookup_cdb(const char *);
+int lookup_passwd(const char *);
 
 
-int timeout = 3;
+int timeout = 5;
 int
 saferead(int fd, void *buf, int len)
 {
@@ -108,12 +156,14 @@ stralloc line = {0};
 ctrlfunc	ctrls[] = {
 		qldap_ctrl_trylogin,
 		qldap_ctrl_generic,
+		localdelivery_init,
 		0 };
 
 int
 main(int argc, char **argv)
 {
 	int match;
+	unsigned int at;
 
 	log_init(STDERR, ~256, 0);
 
@@ -132,13 +182,49 @@ main(int argc, char **argv)
 			cleanup(); /* other side closed pipe */
 			break;
 		}
+
 		logit(32, "qmail-verfiy: verifying %S\n", &line);
-		lookup(&line);
+
+		at = byte_rchr(line.s,line.len,'@');
+		if (at >= line.len) {
+			if (substdio_puts(subfdout, "DSorry, address must "
+			    "include host name. (#5.1.3)") == -1)
+				die_write();
+			if (substdio_putflush(subfdout, "", 1) == -1)
+				die_write();
+			continue;
+		}
+
+		switch (lookup(&line)) {
+		case 0:
+			if (localdelivery()) {
+				/*
+				 * Do the local address lookup.
+				 */
+				line.s[at] = '\0';
+				if (lookup_cdb(line.s) == 1)
+					break;
+				if (lookup_passwd(line.s) == 1)
+					break;
+			}
+			/* Sorry, no mailbox here by that name. */
+			if (substdio_puts(subfdout,
+			    "DSorry, no mailbox here by that name. "
+			    "(#5.1.1)") == -1)
+				die_write();
+			if (substdio_putflush(subfdout, "", 1) == -1)
+				die_write();
+			break;
+		case 1:
+		default:
+			break;
+		}
 	} while (1);
+
 	return 0;
 }
 
-void
+int
 lookup(stralloc *mail)
 {
 	const char *attrs[] = {  LDAP_ISACTIVE, 0 };
@@ -192,11 +278,11 @@ lookup(stralloc *mail)
 			/* admin error, also temporary */
 			temp_fail();
 #endif
-			return;
+			return (-1);
 		case FAILED:
 			/* ... again temporary */
 			temp_fail();
-			return;
+			return (-1);
 		case NOSUCH:
 			break;
 		}
@@ -206,22 +292,15 @@ lookup(stralloc *mail)
 
 	/* nothing found, try a local lookup or a alias delivery */
 	if (rv == NOSUCH) {
-		/* Sorry, no mailbox here by that name. (#5.1.1) */
-		if (substdio_puts(subfdout,
-			    "DSorry, no mailbox here by that name. "
-			    "(#5.1.1)") == -1)
-			die_write();
-		if (substdio_putflush(subfdout, "", 1) == -1)
-			die_write();
 		qldap_free_results(q);
-		return;
+		return (0);
 	}
 
 	/* check if the ldap entry is active */
 	rv = qldap_get_status(q, &status);
 	if (rv != OK) {
 		temp_fail();
-		return;
+		return (-1);
 	}
 	if (status == STATUS_BOUNCE) {
 		/* Mailaddress is administratively disabled. (#5.2.1) */
@@ -232,7 +311,7 @@ lookup(stralloc *mail)
 		if (substdio_putflush(subfdout, "", 1) == -1)
 			die_write();
 		qldap_free_results(q);
-		return;
+		return (1);
 	} else if (status == STATUS_DELETE) {
 		/* Sorry, no mailbox here by that name. (#5.1.1) */
 		if (substdio_puts(subfdout,
@@ -242,13 +321,14 @@ lookup(stralloc *mail)
 		if (substdio_putflush(subfdout, "", 1) == -1)
 			die_write();
 		qldap_free_results(q);
-		return;
+		return (1);
 	}
 
 	/* OK */
 	if (substdio_putflush(subfdout, "K", 1) == -1)
 		die_write();
 	qldap_free_results(q);
+	return (1);
 }
 
 void
@@ -257,5 +337,109 @@ cleanup(void)
 	if (q != 0)
 		qldap_free(q);
 	q = 0;
+}
+
+stralloc lower = {0};
+stralloc wildchars = {0};
+struct cdb cdb;
+
+int
+lookup_cdb(const char *mail)
+{
+	int	fd;
+	int	flagwild;
+	int	r;
+
+	if (!stralloc_copys(&lower, "!")) die_nomem();
+	if (!stralloc_cats(&lower, mail)) die_nomem();
+	if (!stralloc_0(&lower)) die_nomem();
+	case_lowerb(lower.s, lower.len);
+
+	fd = open_read("users/cdb");
+	if (fd == -1)
+		if (errno != error_noent)
+			die_cdb();
+
+	if (fd != -1) {
+		uint32 dlen;
+		unsigned int i;
+
+		cdb_init(&cdb, fd);
+		r = cdb_seek(&cdb, "", 0, &dlen);
+		if (r != 1)
+			die_cdb();
+
+		if (!stralloc_ready(&wildchars, (unsigned int) dlen))
+			die_nomem();
+		wildchars.len = dlen;
+		if (cdb_bread(&cdb, wildchars.s, wildchars.len) == -1)
+			die_cdb();
+
+		i = lower.len;
+		flagwild = 0;
+
+		do {
+			/* i > 0 */
+			if (!flagwild || i == 1 || byte_chr(wildchars.s,
+			    wildchars.len, lower.s[i - 1]) < wildchars.len) {
+				r = cdb_seek(&cdb,lower.s,i,&dlen);
+				if (r == -1)
+					die_cdb();
+				if (r == 1) {
+					/* OK */
+					if (substdio_putflush(subfdout, "K",
+					    1) == -1)
+						die_write();
+					
+					cdb_free(&cdb);
+					close(fd);
+					return (1);
+				}
+			}
+			--i;
+			flagwild = 1;
+		} while (i);
+
+		close(fd);
+	}
+	return (0);
+}
+
+#define GETPW_USERLEN 32
+
+int
+lookup_passwd(const char *local)
+{
+	char username[GETPW_USERLEN];
+	struct stat st;
+	const char *extension;
+	struct passwd *pw;
+
+
+	extension = local + str_len(local);
+	for (; extension >= local; extension--) {
+		if ((unsigned long)(extension - local) < sizeof(username))
+			if (!*extension || (*extension == *auto_break)) {
+				byte_copy(username, extension - local, local);
+				username[extension - local] = 0;
+				case_lowers(username);
+				errno = 0;
+				pw = getpwnam(username);
+				if (errno == error_txtbsy)
+					return temp_sys();
+				if (pw && pw->pw_uid != 0) {
+					if (stat(pw->pw_dir,&st) == 0 &&
+					    st.st_uid == pw->pw_uid) {
+						/* OK */
+						if (substdio_putflush(subfdout,
+						    "K", 1) == -1)
+							die_write();
+						return (1);
+					} else if (error_temp(errno))
+						return temp_nfs();
+				}
+			}
+	}
+	return (0);
 }
 

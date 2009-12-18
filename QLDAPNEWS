@@ -2,7 +2,7 @@ QMAIL_LDAP by Andre Oppermann <opi@nrg4u.com>,
 Claudio Jeker <jeker@n-r-g.com> and Boris Lutz <lutz@n-r-g.com>
 (c) 1999-2004 Internet Business Solutions AG
 
-RELEASE: $Date: 2005/04/01 14:10:30 $ ($Revision: 1.214 $)
+RELEASE: $Date: 2006/02/01 15:59:19 $ ($Revision: 1.220 $)
 
 
 This is the NEWS FILE, so the QLDAPINSTALL file gets a bit cleaner.
@@ -16,6 +16,42 @@ WARNING: If you are upgrading from 20030801a or earlier make sure that
          you have read the news section for 20030901.
 
 NEWS for current stuff:
+
+ Rewritten forwarding code in auth_pop and auth_imap. The copyloop is now
+ using stdin and stdout for communicating with the client. This should fix
+ a problem with ssl encrypted sessions. Additionally write polling was
+ implemented. This should give better reaction on slow links.
+
+ ~control/goodmailaddr allows more ways to check if a address is allowed:
+   foobar@qmail-ldap.org        full match, user & domain
+   @qmail-ldap.org              match domain only (all users are allowed)
+   abuse@                       allow specific user for all domains
+   foo-catchall@qmail-ldap.org  allow addresses like foo-bar@qmail-ldap.org
+                                or foo-bar-baz@qmail-ldap.org
+				will only work if compiled with DASH_EXT
+   catchall@qmail-ldap.org      same as @qmail-ldap.org
+
+ Enhance qmail-verify to check against ~users/cdb and /etc/passwd if local-
+ delivery is enabled (like qmail-lspawn does). This makes RCPTCHECK usefull
+ in mixed user environments.
+
+ Minor enhancements in qmail-verify error handling.
+
+ Some cleanup in qmail-smtpd mostly log stuff.
+ 
+ Set RELAYCLIENT everytime we allow relaying because of some reason (SMTP AUTH
+ or relaymailfrom). Requested by many so that qmail-scanner can make additional
+ decisions based on RELAYCLIENT.
+
+ Just use malloc() instead of the code in alloc.c that code could be exploited
+ on 64-Bit systems with a lot of RAM and no limits.
+
+NEWS for 20050401a stuff:
+
+ Bug fix in qmail-local. qmail-local crashed when trying to access
+ .qmail files with dash extension. Found by s.arakawa.
+
+NEWS for 20050401 stuff:
 
  Enable logging in qmail-verify. It is not perfect but far better than
  before.

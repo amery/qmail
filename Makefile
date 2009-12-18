@@ -139,7 +139,7 @@ sig.h str.h stralloc.h substdio.h timeoutread.h auth_mod.h
 auth_mod.o: \
 compile auth_mod.c auth_mod.h checkpassword.h byte.h localdelivery.h \
 locallookup.h output.h qldap.h qldap-debug.h qldap-errno.h stralloc.h \
-read-ctrl.h dirmaker.h qldap-cluster.h select.h
+read-ctrl.h dirmaker.h qldap-cluster.h select.h alloc.h
 	./compile $(LDAPFLAGS) $(DEBUG) $(HDIRMAKE) $(MDIRMAKE) auth_mod.c
 
 auth_pop: \
@@ -2061,13 +2061,14 @@ load qmail-smtpd.o rcpthosts.o commands.o timeoutread.o rbl.o \
 timeoutwrite.o ip.o ipme.o ipalloc.o control.o constmap.o received.o \
 date822fmt.o now.o qmail.o execcheck.o cdb.a smtpcall.o coe.o fd.a \
 seek.a wait.a datetime.a getln.a open.a sig.a case.a env.a stralloc.a \
-alloc.a substdio.a error.a str.a fs.a auto_qmail.o dns.lib socket.lib
+alloc.a substdio.a error.a str.a fs.a auto_qmail.o auto_break.o \
+dns.lib socket.lib
 	./load qmail-smtpd rcpthosts.o commands.o timeoutread.o rbl.o \
 	timeoutwrite.o ip.o ipme.o ipalloc.o control.o constmap.o \
 	received.o date822fmt.o now.o qmail.o execcheck.o cdb.a \
 	smtpcall.o coe.o fd.a seek.a wait.a datetime.a getln.a \
 	open.a sig.a case.a env.a stralloc.a alloc.a substdio.a \
-	error.a fs.a auto_qmail.o dns.o str.a \
+	error.a fs.a auto_qmail.o dns.o str.a auto_break.o \
 	`cat dns.lib` `cat socket.lib` $(TLSLIBS) $(ZLIB)
 
 qmail-smtpd.0: \
@@ -2079,7 +2080,8 @@ compile qmail-smtpd.c sig.h readwrite.h stralloc.h gen_alloc.h \
 substdio.h alloc.h auto_qmail.h control.h received.h constmap.h \
 error.h ipme.h ip.h ipalloc.h ip.h gen_alloc.h ip.h qmail.h \
 substdio.h str.h fmt.h scan.h byte.h case.h env.h now.h datetime.h \
-exit.h rcpthosts.h timeoutread.h timeoutwrite.h commands.h rbl.h
+exit.h rcpthosts.h timeoutread.h timeoutwrite.h commands.h rbl.h \
+qmail-ldap.h auto_break.h
 	./compile $(LDAPFLAGS) $(TLS) $(TLSINCLUDES) $(ZINCLUDES) \
 	qmail-smtpd.c
 
@@ -2177,15 +2179,17 @@ qmail-users.9 conf-break conf-spawn
 
 qmail-verify: \
 load qmail-verify.o qldap.a read-ctrl.o control.o getln.a substdio.a \
-stralloc.a env.a alloc.a error.a open.a fs.a case.a str.a timeoutread.o \
-auto_qmail.o
+stralloc.a env.a alloc.a error.a open.a fs.a case.a cdb.a str.a timeoutread.o \
+localdelivery.o auto_qmail.o
 	./load qmail-verify qldap.a read-ctrl.o control.o getln.a \
 	substdio.a stralloc.a env.a alloc.a error.a open.a fs.a case.a \
-	str.a timeoutread.o auto_qmail.o $(LDAPLIBS)
+	cdb.a str.a seek.a timeoutread.o localdelivery.o auto_qmail.o \
+	$(LDAPLIBS)
 
 qmail-verify.o: \
-compile qmail-verify.c error.h getln.h output.h qldap.h qldap-debug.h \
-qldap-errno.h qmail-ldap.h read-ctrl.h stralloc.h subfd.h substdio.h \
+compile qmail-verify.c auto_break.h byte.h case.h cdb.h error.h getln.h \
+localdelivery.h open.h output.h qldap.h qldap-debug.h qldap-errno.h \
+qmail-ldap.h read-ctrl.h str.h stralloc.h subfd.h substdio.h \
 timeoutread.h
 	./compile $(LDAPFLAGS) $(DEBUG) qmail-verify.c
 

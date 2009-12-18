@@ -147,6 +147,17 @@ void rbladdheader(char *base, char *matchon, char *message)
   if(!stralloc_cats(&rblmessage, "\n")) die_nomem();
 }
 
+void
+rbllog(int level, const char* baseaddr, const char *msg)
+{
+	logpid(level);
+	logstring(level, "RBL check with '");
+	logstring(level, baseaddr);
+	logstring(level, "': ");
+	logstring(level, msg);
+        logflush(level);
+}
+
 int rblcheck(const char *remoteip, char** rblname, int rbloh)
 {
   int r = 1;
@@ -156,33 +167,30 @@ int rblcheck(const char *remoteip, char** rblname, int rbloh)
   if(!rbl_start(remoteip)) return 0;
 
   for (i=0; i < numrbl; i++) {
-    logpid(2); logstring(2,"RBL check with '");
-    logstring(2,rbl[i].baseaddr); logstring(2,"': ");
-
     r = rbl_lookup(rbl[i].baseaddr, rbl[i].matchon);
+
     if (r == 2) {
-      logstring(2,"temporary DNS error, ignored"); logflush(2);
+      rbllog(3,rbl[i].baseaddr, "temporary DNS error, ignored");
     } else if (r == 1) {
-      logstring(2,"found match, ");
       *rblname = rbl[i].message;
       if (rbloh) {
-	logstring(2,"tag header"); logflush(2);
+        rbllog(3,rbl[i].baseaddr, "found match, tag header");
 	rbladdheader(rbl[i].baseaddr, rbl[i].matchon, rbl[i].message);
 	continue;
       }
       if (!str_diff("addheader", rbl[i].action)) {
-	logstring(2,"tag header"); logflush(2);
+        rbllog(3,rbl[i].baseaddr, "found match, tag header");
 	rbladdheader(rbl[i].baseaddr, rbl[i].matchon, rbl[i].message);
 	continue;
       } else {
 	/* default reject */
-	logstring(2,"reject sender"); logflush(2);
+        rbllog(2,rbl[i].baseaddr, "found match, reject sender");
 	rblprintheader = 0;
 	return 1;
       }
     }
     /* continue */
-    logstring(2,"no match found, continue."); logflush(2);
+    rbllog(3,rbl[i].baseaddr, "no match found, continue.");
   }
   return 0; /* either tagged, soft error or allowed */
 }

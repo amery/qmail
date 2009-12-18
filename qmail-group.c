@@ -463,7 +463,7 @@ secretary(char *maildir, int flagcheck)
 		if (r == 0)
 			/* need to wait for confirmation */
 			_exit(0);
-		for (j = 0; j < r; i++) {
+		for (j = 0; j < r; j++) {
 			if (j == 0) {
 				if (sbuf[j] != 'K')
 					strerr_die2x(111, FATAL,

@@ -33,6 +33,7 @@
  */
 #include <sys/types.h>
 #include <unistd.h>
+#include "alloc.h"
 #include "byte.h"
 #include "error.h"
 #include "localdelivery.h"
@@ -218,97 +219,122 @@ chdir_or_make(char *home, char *maildir)
 }
 
 #ifdef QLDAP_CLUSTER
-static int allwrite(int (*)(),int, void *,int);
-static void copyloop(int, int, int);
-static char copybuf[4096];
-
-static int
-allwrite(int (*op)(),int fd, void *buf,int len)
-{
-	char	*b = buf;
-	int	 w;
-
-	while (len) {
-		w = op(fd, b, len);
-		if (w == -1) {
-			if (errno == error_intr) continue;
-			return -1;
-		}
-		if (w == 0) ; /* luser's fault */
-		b += w;
-		len -= w;
-	}
-	return 0;
-}
+#define COPY_BUF_SIZE	8192
+static void copyloop(int, int, int, int);
 
 static void
-copyloop(int infd, int outfd, int timeout)
+copyloop(int infdr, int infdw, int outfd, int timeout)
 {
-	fd_set	iofds;
+	fd_set	rfds, wfds;
 	struct	timeval tv;
 	int	maxfd;	/* Maximum numbered fd used */
-	int	bytes, ret;
+	int	r, inpos = 0, outpos = 0;
+	int	inok = 1, outok = 1;
+	char	*inbuf, *outbuf;
 
-	ndelay_off(infd); ndelay_off(outfd);
+	inbuf = alloc(COPY_BUF_SIZE);
+	outbuf = alloc(COPY_BUF_SIZE);
+
+	if (inbuf == (char *)0 || outbuf == (char *)0) {
+		logit(1, "copyloop: %s\n", error_str(errno));
+		close(infdr);
+		close(infdw);
+		close(outfd);
+		return;
+	}
+
+	maxfd = infdr > infdw ? infdr : infdw;
+	maxfd = (maxfd > outfd ? maxfd : outfd) + 1;
+
 	while (1) {
 		/* file descriptor bits */
-		FD_ZERO(&iofds);
-		maxfd = -1;
-		FD_SET(infd, &iofds);
-		if (infd > maxfd)
-			maxfd = infd;
-		FD_SET(outfd, &iofds);
-		if (outfd > maxfd)
-			maxfd = outfd;
+		FD_ZERO(&rfds);
+		FD_ZERO(&wfds);
+		if (inok && inpos < COPY_BUF_SIZE)
+			FD_SET(infdr, &rfds);
+		if (outpos != 0)
+			FD_SET(infdw, &wfds);
+		if (outok && outpos < COPY_BUF_SIZE)
+			FD_SET(outfd, &rfds);
+		if (inpos != 0)
+			FD_SET(outfd, &wfds);
 
 		/* Set up timeout */
 		tv.tv_sec = timeout;
 		tv.tv_usec = 0;
 
-		ret = select(maxfd + 1, &iofds, (fd_set *)0, (fd_set *)0, &tv);
-		if (ret == -1) {
-			logit(1, "copyloop: select failed %s\n",
+		r = select(maxfd, &rfds, &wfds, (fd_set *)0, &tv);
+		if (r == -1) {
+			logit(1, "copyloop: select: %s\n",
 			    error_str(errno));
 			break;
-		} else if (ret == 0) {
+		} else if (r == 0) {
 			logit(32, "copyloop: select timeout\n");
 			break;
 		}
-		if (FD_ISSET(infd, &iofds)) {
-			if ((bytes = read(infd, copybuf,
-					    sizeof(copybuf))) < 0) {
-				logit(1, "copyloop: read failed: %s\n",
+
+		if (FD_ISSET(infdr, &rfds)) {
+			if ((r = subread(infdr, inbuf + inpos,
+			    COPY_BUF_SIZE - inpos)) == -1) {
+				if (errno == error_intr) continue;
+				logit(1, "copyloop: read: %s\n",
 				    error_str(errno));
 				break;
 			}
-			if (bytes == 0)
-				break;
-			if (allwrite(subwrite, outfd, copybuf, bytes) != 0) {
-				logit(1, "copyloop: write out failed: %s\n",
-				    error_str(errno));
-				break;
-			}
+			if (r == 0)
+				inok = 0;
+			inpos += r;
 		}
-		if (FD_ISSET(outfd, &iofds)) {
-			if ((bytes = read(outfd, copybuf,
-					    sizeof(copybuf))) < 0) {
-				logit(1, "copyloop: read failed: %s\n",
+		if (FD_ISSET(outfd, &rfds)) {
+			if ((r = subread(outfd, outbuf + outpos,
+			    COPY_BUF_SIZE - outpos)) == -1) {
+				if (errno == error_intr) continue;
+				logit(1, "copyloop: read: %s\n",
 				    error_str(errno));
 				break;
 			}
-			logit(32, "copyloop: read in %i bytes read\n", bytes);
-			if (bytes == 0)
-				break;
-			if (allwrite(subwrite, infd, copybuf, bytes) != 0) {
-				logit(1, "copyloop: write in failed: %s\n",
-				    error_str(errno));
-				break;
-			}
+			if (r == 0)
+				outok = 0;
+			outpos += r;
 		}
+		if (FD_ISSET(infdw, &wfds)) {
+			if ((r = subwrite(infdw, outbuf, outpos)) == -1) {
+				if (errno == error_intr) continue;
+				logit(1, "copyloop: write: %s\n",
+				    error_str(errno));
+				break;
+			}
+			if (r != outpos)
+				byte_copy(outbuf, outpos - r, outbuf + r);
+			outpos -= r;
+		}
+		if (FD_ISSET(outfd, &wfds)) {
+			if ((r = subwrite(outfd, inbuf, inpos)) == -1) {
+				if (errno == error_intr) continue;
+				logit(1, "copyloop: write: %s\n",
+				    error_str(errno));
+				break;
+			}
+			if (r != inpos)
+				byte_copy(inbuf, inpos - r, inbuf + r);
+			inpos -= r;
+		}
+
+		if (inok == 0 && inpos == 0)
+			/* half close forwarding channel */
+			shutdown(outfd, SHUT_WR);
+
+		if (outpos == 0 && outok == 0)
+			/*
+			 * Can not half close channel to client so finish the
+			 * communication. Server is no longer intrested anyway.
+			 */
+			break;
 	}
-	close(infd);
+
+	close(infdr);
+	close(infdw);
 	close(outfd);
-	return;
 }
 
 void
@@ -357,7 +383,7 @@ forward(char *name, char *passwd, struct credentials *c)
 	
 	/* We have a connection, first send user and pass */
 	auth_forward(ffd, name, passwd);
-	copyloop(0, ffd, timeout);
+	copyloop(0, 1, ffd, timeout);
 
 	_exit(0); /* all went ok, exit normaly */
 }
