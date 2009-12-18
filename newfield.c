@@ -1,3 +1,5 @@
+#include <sys/types.h>
+#include <unistd.h>
 #include "fmt.h"
 #include "datetime.h"
 #include "stralloc.h"
@@ -25,7 +27,7 @@ datetime_sec when;
 
 static unsigned int msgidfmt(s,idhost,idhostlen,when)
 char *s;
-char *idhost;
+const char *idhost;
 int idhostlen;
 datetime_sec when;
 {
@@ -58,7 +60,7 @@ datetime_sec when;
 }
 
 int newfield_msgidmake(idhost,idhostlen,when)
-char *idhost;
+const char *idhost;
 int idhostlen;
 datetime_sec when;
 {

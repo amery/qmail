@@ -1,0 +1,194 @@
+POPBEFORESMTP by Claudio Jeker <jeker@n-r-g.com> and 
+Andre Oppermann <opi@nrg4u.com>
+(c) 2002-2004 Internet Business Solutions Ltd.
+
+The POPBEFORESMTP tools are a part of the qmail-ldap patch.
+This patch for qmail comes with NO WARRANTY.
+
+RELEASE: current ($Date: 2004/04/16 13:24:16 $)
+
+POP-Before-SMTP:
+======================
+
+TOC:
+ HOW DOES IT WORK
+ INSTALL
+ CONFIG FILES
+ SETUP
+  - pbsadd
+  - pbscheck
+  - pbsdbd
+ EXAMPLES
+
+================================================================================
+
+HOW DOES IT WORK
+
+ From http://www.lifewithqmail.org/ldap:
+    As we all know, SMTP does not contain any authentication mechanisms by
+    default. So in practice you are allowing relaying through your server only
+    for some IP addresses, normally your corporate network. If your users are
+    coming from various, dynamic IP addresses they can't use your mailserver
+    for sending :-((
+    
+    To overcome this limitation there are 3 possibilities:
+    
+    -  relaying based on the envelope sender - a really bad idea, easy to abuse.
+    -  SMTP AUTH - great, but your clients need to support it. For a patch see
+       http://www.lifewithqmail.org/ldap
+    -  POP-before-SMTP - when the user gets his mail through pop3 or imap, his
+       IP address is recorded and the permission to relay is given for this IP
+       for a defined time.
+    
+    SMTP AUTH would be the best solution as username and password are supplied
+    when sending, but as long as too many clients are lacking support for it,
+    this is not an option for most of us.
+    
+ Most POP-before-SMTP solutions use the tcpserver tcprules cdb file to
+ store the allowed IP addresses. This does not work in a clustered setup.
+ Our solution uses two clients pbsadd and pbscheck and a server pbsdbd which 
+ stores the IP addresses in a database.
+ pbsadd has to be added just after auth_pop or auth_imap and will add new
+ allowed IP addresses to the cache.
+ pbscheck runs before qmail-smtpd and sets the RELAYCLIENT environment if the
+ IP address is allowed to relay.
+ pbsdbd is the Pop-Before-Smtp DataBase Daemon. pbsdbd uses a similar cache 
+ algorithm as djbdns' dnscache daemon.
+ pbsadd and pbscheck communicate over UDP with the pbsdbd server.
+ 
+================================================================================
+
+INSTALL
+
+ The Tools pbsadd, pbscheck and pbsdbd are installed in the qmail binary
+ directory, normally /var/qmail/bin.
+ 
+ NOTE: the tools can also be used on qmail systems without the qmail-ldap patch.
+ 
+================================================================================
+
+CONFIG FILES
+
+~control/pbsservers
+ 
+ A list of IP addresses of running pbsdbd servers.
+ This file is only used by the clients pbsadd and pbscheck.
+ Required
+ Example:
+   127.0.0.1
+   10.0.1.1
+   10.0.2.1
+ 
+~control/pbsip
+ 
+ The pbsdbd server's address is given through this control file.
+ This file is only needed for the pbsdbd server.
+ Default: 0.0.0.0
+ Example: 127.0.0.1
+ 
+~control/pbsport
+
+ The port where all pbsdbd servers are listening on.
+ This file if used is needed by all pbs tools and has to be in sync on all
+ cluster machines. 
+ Default: 2821
+ Example: 6666
+ Note: Ports > 1024 should be used so that the pbsdbd server can be run
+       unprivileged.
+ 
+~control/pbssecret
+
+ Shared secret used by pbsadd and pbsdbd to authenticate the client.
+ Required for pbsdbd and pbsadd.
+ Example: mekmitasdigoat
+ 
+~control/pbscachesize
+
+ Size in bytes used for the cache. Normally you do not need to set this
+ because the default value is big enough.
+ Default: 1048576 /* equal to 1 MB */
+
+~control/pbstimeout
+ 
+ Timeout in seconds until entries in the cache are invalidated.
+ Only used by the pbsdbd server.
+ Default: 600
+ Example: 900
+ 
+~control/pbsenv
+
+ Additional environment variables to include.
+ pbscheck will set these variables to the values pbsadd returned.
+ It is possible to rewrite the variables. A line like
+ USER=TCPREMOTEINFO will cause pbscheck to set the environment TCPREMOTEINFO
+ to the value set as USER in pbsadd. If you like to prepend some identifier
+ in front of the value you can this like this:
+ USER=TCPREMOTEINFO=[pbs]   this will add [pbs] in front of the value returned
+ by pbsadd.
+ Multiline.
+ Default: none
+ Example: HOST
+          TCPREMOTEIP=FROMIP
+          USER=TCPREMOTEINFO=[pbs]
+          
+
+================================================================================
+
+SETUP
+
+pbsadd:
+  usage: pbsadd subprogram ...
+  
+  pbsadd will try to add the IP address $TCPREMOTEIP to all pbsdbd servers
+  listed in ~control/pbsservers. Afterward the subprogram with its arguments
+  is started.
+  On non fatal errors the subprogram will be started without successfully 
+  update the database on the pbsdbd servers.
+  
+pbscheck:
+  usage: pbscheck subprogram ...
+  
+  pbscheck checks if the IP address $TCPREMOTEIP is allowed to relay.
+  It will send queries to the pbsdbd servers listed in ~control/pbsservers.
+  The first query will be sent to a randomly chosen server, if this timeouts
+  all servers will be tried one after another.
+  If the IP is allowed to relay the environment $RELAYCLIENT is set.
+  On non fatal errors the subprogram will be started without setting
+  $RELAYCLIENT.
+  
+pbsdbd:
+  usage: pbsdbd
+  
+  pbsdbd will listen on address specified in ~control/pbsip and the port 
+  specified in ~control/pbsport (default 2821).
+  IP addresses will only be added to the cache if the secret specified in
+  ~control/pbssecret is included in the add request.
+
+================================================================================
+
+EXAMPLES
+
+ First create all necessary ~control files.
+ 
+ NOTE: the following shell scripts are not finished. You have to edit them to
+ modify them for your needs.
+ 
+ The pbsdbd should be run as unprivileged user, this can be done with setuidgid.
+ 
+ #!/bin/sh
+ setuidgid qmaild pbsdbd
+ 
+ pbsadd has to be run after auth_pop, auth_imap or checkpassword in the pop3 or
+ imap tool chain.
+ 
+ #!/bin/sh
+ tcpserver 0 110 qmail-popup $HOST auth_pop pbsadd qmail-pop3d ./Maildir/
+ 
+ 
+ pbscheck has to be run before qmail-smtpd.
+ 
+ #!/bin/sh
+ tcpserver -x $SMTPRULES -v -u qmaild -g nofiles 0 25 pbscheck qmail-smtpd
+ 
+
+END :-)

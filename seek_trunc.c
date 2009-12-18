@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <unistd.h>
 #include "seek.h"
 
 int seek_trunc(fd,pos) int fd; seek_pos pos;

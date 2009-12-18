@@ -1,0 +1,170 @@
+QMAILGROUP by Claudio Jeker <jeker@n-r-g.com>
+(c) 2004 Internet Business Solutions Ltd.
+
+
+RELEASE: $Date: 2004/12/01 14:19:49 $ ($Revision: 1.3 $)
+
+qmail-group and qmail-secretary:
+====================================
+
+While it is possible to implement simple mail distributors via multiple
+mailFrowarding entries in qmail-ldap it is not possible to do more complex or
+dynamic mail distributors. qmail-group adds this capability -- with the help of
+qmail-secretary -- to qmail-ldap.
+
+qmail-group extends the basic qmailUser object with a new LDAP objectclass
+qmailGroup. The new object adds fields to specify members, senders and
+moderators for the list together with some standard settings. To define a
+mailing group both qmailUser and qmailGroup objects are necessary.
+
+LDAP Schema:
+
+In addition to the qmailUser attributes the following additional attributes are
+defined by qmailGroup:
+
+senderconfirm:
+  If this boolean attribute is set to true than an incomming mail needs to be
+  approved by the sender. This ensures that the sender is aware that he is
+  sending to a list and makes it almost impossible to send forged mails, spam,
+  mail viruses and other junk to be distributed to list. If sender confirmation
+  is used a confirmation message is sent to the sender. This needs to reply to
+  that message if he does not do that the mail will be deleted after 1 week.
+  By default senderconfirmation is turned off.
+
+membersonly:
+  If this boolean attribute is set to true than an incomming mail needs to come
+  from a member of the list. Only the envelope sender address is used for the
+  check. Because it is easy to forge the envelope sender address sender-
+  confirmation should be enabled too.
+
+dnmember:
+filtermember:
+rfc822member:
+  Members of the group are specified by these attributes. It is possible to
+  specify a member by a LDAP distinguish name, a LDAP filter definiton or by
+  a rfc822 email address.
+ Example:
+  dnmember: uid=joe,ou=example,o=qmail-ldap,c=CH
+  filetrmember: ((objectclass=qmailUser)(employeeType=accountant))
+  rfc822member: alice@qmail-ldap.org
+
+dnsender:
+filtersender:
+rfc822sender:
+  It is possible to limit the allowed users to send to the list. If membersonly
+  is set to true and one of the sender attributes is set, mails to the list are
+  enforced to come form on of the specified senders. See also membersonly.
+
+dnmoderator:
+rfc822moderator:
+  The mail group can be moderated -- mails need to be approved by one of the
+  specified moderators. An approval message is sent t each specified moderator.
+  Again to approve a message on of the moderators needs to reply the approval
+  message. If no approval was sent in one week the mail is deleted.
+
+confirmtext:
+  This attribute can be used to specify a own confirm text used if sender-
+  confirmation is used. The usual %HEADER% magic of qmail-reply et al. can be
+  used here.
+
+moderatortext:
+  This attribute can be used to specify a own approval text used if the list
+  is moderated. The usual %HEADER% magic of qmail-reply et al. can be used
+  here too.
+
+bounceadmin:
+  Bounceadmin can be set to one or multiple rfc822 email addresses. Mail
+  delivery errors are then forwarded to these addresses instead of the sender
+  of the original mail.
+
+To enable a mail-group at least following qmailUser attributes need to be set
+too:
+
+mail: main mailaddress of the list
+mailalternateaddress: needs to be set to list-catchall@domain.tld, this is used
+  for moderation and sender confirmation but also for bounce handling.
+mailmessagestore: A valid messagestore for sender confirmation and moderation
+  is needed.
+
+
+qmail-secretary:
+
+qmail-secretary is a helper program for qmail-group and ezmlm. It implements
+both moderation and sender confirmation. qmail-group calls qmail-secretary
+internally but for ezmlm the .qmail files need to be adapted.
+
+usage (non ezmlm mode):
+qmail-secretary [ -Z ] [ -c | -C ] [[ -m addr ] ... ] [ -M file ] maildir
+
+usage (ezmlm mode):
+qmail-secretary -z ezmlmdir [ -c | -C ] [[ -m addr ] ... ] [ -M file ]
+	maildir [ ezmlm-send ... ]
+
+Options:
+-C          Disable sender confirmation (default)
+-M file     Use file as a list of moderators. One per line.
+-Z          Non ezmlm mode (default).
+-c          Enable sender confirmation
+-m addr     Add addr to the list of moderators
+-z ezmlmdir Enable ezmlm mode and use ezmlmdir as base directory for
+            configuration.
+
+qmail-secretary uses the secified Maildir to store the messages that need
+approval. Messages that need to be confirmed are stored in maildir/new and
+messages waiting for moderation approval are stored in maildir/cur.
+
+In ezmlm mode following files from ezmlmdir are read:
+mailinglist  Address of the mailing list
+inhost       Incomming Host
+inlocal      Incomming Local Address part
+outhost      Outgoing Host
+outlocal     outgoing Local Address part
+text/approve The moderation approve request text
+text/confirm The sender confirmation request text
+
+In non ezmlm mode the information are extraceted from the environment. Mainly
+from:
+$LOCAL
+$SENDER
+$HOST
+$EXT
+$APPROVEMESS
+$CONFIRMMESS
+
+LOCAL, SENDER, HOST and EXT are set by qmail-local but APPROVEMESS and
+CONFIRMMESS can be set by the caller.
+
+Mails are tagged with a cryptographic hash. Sender confirmations are received
+by $LOCAL-confirm-<HASH>@$HOST and bounces end in $LOCAL-reject-<HASH>@$HOST.
+Moderation messages are received by $LOCAL-approve-<HASH>@$HOST and bounces
+end in $LOCAL-bounce-<HASH>@$HOST.
+
+Simple setup:
+Following qmail files should be set for sender confirmation..
+
+.qmail
+|qmail-secretary -c ./Maildir/secretary
+<other deliveries>
+
+.qmail-confirm-default
+|qmail-secretary -c ./Maildir/secretary
+
+.qmail-reject-default
+|qmail-secretary -c ./Maildir/secretary
+
+It is possible to just add a .qmail-default instead of .qmail-confirm-default
+and .qmail-reject-default.
+
+Simple ezmlm setup:
+.qmail
+|qmail-secretary -c -z ezmlmdir ezmlmdir/secretary/ ezmlm-send ezmlmdir
+|ezmlm-send ezmlmdir
+|ezmlm-warn ezmlmdir || exit 0
+
+.qmail-default
+|qmail-secretary -c -z ezmlmdir ezmlmdir/secretary/ ezmlm-send ezmlmdir
+|ezmlm-manage ezmlmdir
+|ezmlm-warn ezmlmdir || exit 0
+
+The other .qmail files don't need to be modified.
+

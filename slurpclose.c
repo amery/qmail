@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "stralloc.h"
 #include "readwrite.h"
 #include "slurpclose.h"
@@ -6,7 +7,7 @@
 int slurpclose(fd,sa,bufsize)
 int fd;
 stralloc *sa;
-int bufsize;
+unsigned int bufsize;
 {
   int r;
   for (;;) {

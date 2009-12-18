@@ -1,7 +1,8 @@
 #ifndef FORK_H
 #define FORK_H
 
-extern int fork();
+#include <unistd.h>
+
 #define vfork fork
 
 #endif

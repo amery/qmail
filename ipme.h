@@ -6,7 +6,7 @@
 
 extern ipalloc ipme;
 
-extern int ipme_init();
-extern int ipme_is();
+extern int ipme_init(void);
+extern int ipme_is(struct ip_address *);
 
 #endif

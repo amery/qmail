@@ -2,9 +2,9 @@
 
 unsigned int str_copy(s,t)
 register char *s;
-register char *t;
+register const char *t;
 {
-  register int len;
+  register unsigned int len;
 
   len = 0;
   for (;;) {

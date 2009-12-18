@@ -3,8 +3,8 @@
 #include "case.h"
 
 static constmap_hash hash(s,len)
-char *s;
-int len;
+const char *s;
+unsigned int len;
 {
   unsigned char ch;
   constmap_hash h;
@@ -18,10 +18,10 @@ int len;
   return h;
 }
 
-char *constmap(cm,s,len)
+const char *constmap(cm,s,len)
 struct constmap *cm;
-char *s;
-int len;
+const char *s;
+unsigned int len;
 {
   constmap_hash h;
   int pos;
@@ -39,28 +39,29 @@ int len;
 
 int constmap_init(cm,s,len,flagcolon)
 struct constmap *cm;
-char *s;
-int len;
+const char *s;
+unsigned int len;
 int flagcolon;
 {
-  int i;
-  int j;
-  int k;
+  unsigned int i;
+  unsigned int j;
+  unsigned int k;
   int pos;
   constmap_hash h;
  
   cm->num = 0;
   for (j = 0;j < len;++j) if (!s[j]) ++cm->num;
+  if (cm->num < 0) return 0;
  
   h = 64;
-  while (h && (h < cm->num)) h += h;
+  while (h && (h < cm->num)) h += h; /* XXX why is num an int */
   cm->mask = h - 1;
  
   cm->first = (int *) alloc(sizeof(int) * h);
   if (cm->first) {
-    cm->input = (char **) alloc(sizeof(char *) * cm->num);
+    cm->input = (const char **) alloc(sizeof(char *) * cm->num);
     if (cm->input) {
-      cm->inputlen = (int *) alloc(sizeof(int) * cm->num);
+      cm->inputlen = (unsigned int *) alloc(sizeof(unsigned int) * cm->num);
       if (cm->inputlen) {
         cm->hash = (constmap_hash *) alloc(sizeof(constmap_hash) * cm->num);
         if (cm->hash) {
@@ -111,4 +112,5 @@ struct constmap *cm;
   alloc_free(cm->inputlen);
   alloc_free(cm->input);
   alloc_free(cm->first);
+  cm->num = 0;
 }

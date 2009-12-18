@@ -8,6 +8,7 @@
 #ifndef SIOCGIFCONF /* whatever works */
 #include <sys/sockio.h>
 #endif
+#include <unistd.h>
 #include "hassalen.h"
 #include "byte.h"
 #include "ip.h"
@@ -21,7 +22,7 @@ ipalloc ipme = {0};
 int ipme_is(ip)
 struct ip_address *ip;
 {
-  int i;
+  unsigned int i;
   if (ipme_init() != 1) return -1;
   for (i = 0;i < ipme.len;++i)
     if (byte_equal(&ipme.ix[i].ip,4,ip))
@@ -36,8 +37,8 @@ int ipme_init()
   struct ifconf ifc;
   char *x;
   struct ifreq *ifr;
-  struct sockaddr_in *sin;
-  int len;
+  struct sockaddr_in *s_in;
+  unsigned int len;
   int s;
   struct ip_mx ix;
  
@@ -45,6 +46,12 @@ int ipme_init()
   if (!ipalloc_readyplus(&ipme,0)) return 0;
   ipme.len = 0;
   ix.pref = 0;
+
+  /* 0.0.0.0 is a special address which always refers to 
+   * "this host, this network", according to RFC 1122, Sec. 3.2.1.3a.
+   */
+  byte_copy(&ix.ip,4,"\0\0\0\0");
+  if (!ipalloc_append(&ipme,&ix)) { return 0; }
  
   if ((s = socket(AF_INET,SOCK_STREAM,0)) == -1) return -1;
  
@@ -70,8 +77,8 @@ int ipme_init()
     if (len < sizeof(*ifr))
       len = sizeof(*ifr);
     if (ifr->ifr_addr.sa_family == AF_INET) {
-      sin = (struct sockaddr_in *) &ifr->ifr_addr;
-      byte_copy(&ix.ip,4,&sin->sin_addr);
+      s_in = (struct sockaddr_in *) &ifr->ifr_addr;
+      byte_copy(&ix.ip,4,&s_in->sin_addr);
       if (ioctl(s,SIOCGIFFLAGS,x) == 0)
         if (ifr->ifr_flags & IFF_UP)
           if (!ipalloc_append(&ipme,&ix)) { close(s); return 0; }
@@ -82,8 +89,8 @@ int ipme_init()
       if (ifr->ifr_flags & IFF_UP)
         if (ioctl(s,SIOCGIFADDR,x) == 0)
 	  if (ifr->ifr_addr.sa_family == AF_INET) {
-	    sin = (struct sockaddr_in *) &ifr->ifr_addr;
-	    byte_copy(&ix.ip,4,&sin->sin_addr);
+	    s_in = (struct sockaddr_in *) &ifr->ifr_addr;
+	    byte_copy(&ix.ip,4,&s_in->sin_addr);
 	    if (!ipalloc_append(&ipme,&ix)) { close(s); return 0; }
 	  }
 #endif

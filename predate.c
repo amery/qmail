@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <time.h>
+#include <unistd.h>
 #include "datetime.h"
 #include "fork.h"
 #include "wait.h"
@@ -10,17 +11,18 @@
 #include "subfd.h"
 #include "readwrite.h"
 #include "exit.h"
+#include "sig.h"
 
 #define FATAL "predate: fatal: "
 
-static char *montab[12] = {
+static const char *montab[12] = {
 "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"
 };
 
 char num[FMT_ULONG];
 char outbuf[1024];
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
@@ -29,7 +31,7 @@ char **argv;
   struct datetime dt;
   datetime_sec utc;
   datetime_sec local;
-  int minutes;
+  unsigned int minutes;
   int pi[2];
   substdio ss;
   int wstat;
@@ -55,7 +57,7 @@ char **argv;
       strerr_die4sys(111,FATAL,"unable to run ",argv[1],": ");
   }
   close(pi[0]);
-  substdio_fdbuf(&ss,write,pi[1],outbuf,sizeof(outbuf));
+  substdio_fdbuf(&ss,subwrite,pi[1],outbuf,sizeof(outbuf));
 
   time(&now);
 
@@ -112,5 +114,5 @@ char **argv;
     strerr_die2sys(111,FATAL,"wait failed: ");
   if (wait_crashed(wstat))
     strerr_die2x(111,FATAL,"child crashed");
-  _exit(wait_exitcode(wstat));
+  return wait_exitcode(wstat);
 }

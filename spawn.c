@@ -1,5 +1,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include "readwrite.h"
+#include "alloc.h"
 #include "sig.h"
 #include "wait.h"
 #include "substdio.h"
@@ -15,10 +18,12 @@
 #include "auto_uids.h"
 #include "auto_spawn.h"
 
-extern int truncreport;
+extern unsigned int truncreport;
 extern int spawn();
 extern void report();
 extern void initialize();
+
+int flagreinit = 0;
 
 struct delivery
  {
@@ -28,6 +33,9 @@ struct delivery
   int wstat; /* if !pid: status of child */
   int fdout; /* pipe output, -1 if !pid; delays eof until after death */
   stralloc output;
+#ifdef DEBUG
+  stralloc log;
+#endif
  }
 ;
 
@@ -37,7 +45,7 @@ void sigchld()
 {
  int wstat;
  int pid;
- int i;
+ unsigned int i;
  while ((pid = wait_nohang(&wstat)) > 0)
    for (i = 0;i < auto_spawn;++i) if (d[i].used)
      if (d[i].pid == pid)
@@ -63,30 +71,44 @@ int okwrite(fd,buf,n) int fd; char *buf; int n;
 int flagreading = 1;
 char outbuf[1024]; substdio ssout;
 
-int stage = 0; /* reading 0:delnum 1:messid 2:sender 3:recip */
+int stage = 0; /* reading 0:delnum 1:delnum2 2:messid 3:sender 4:recip */
 int flagabort = 0; /* if 1, everything except delnum is garbage */
-int delnum;
+unsigned int delnum;
 stralloc messid = {0};
 stralloc sender = {0};
 stralloc recip = {0};
 
 void err(s) char *s;
 {
- char ch; ch = delnum; substdio_put(&ssout,&ch,1);
+ unsigned char ch;
+ ch = delnum; substdio_put(&ssout,&ch,1);
+ ch = delnum >> 8; substdio_put(&ssout,&ch,1);
  substdio_puts(&ssout,s); substdio_putflush(&ssout,"",1);
 }
 
 void docmd()
 {
  int f;
- int i;
- int j;
+ unsigned int i;
+ unsigned int j;
  int fdmess;
  int pi[2];
  struct stat st;
 
+ /* SIGHUP HANDLING */
+ if (delnum == 0xbeef)
+   if (*messid.s == '\0' && *sender.s == '\0' && *recip.s == '\0') {
+#if 0
+     err("HHUP received\n");
+#endif
+     flagreinit = 1;
+     return;
+   }
+ 
  if (flagabort) { err("Zqmail-spawn out of memory. (#4.3.0)\n"); return; }
+#if 0 /* no longer possible, delnum is unsigned */
  if (delnum < 0) { err("ZInternal error: delnum negative. (#4.3.5)\n"); return; }
+#endif
  if (delnum >= auto_spawn) { err("ZInternal error: delnum too big. (#4.3.5)\n"); return; }
  if (d[delnum].used) { err("ZInternal error: delnum in use. (#4.3.5)\n"); return; }
  for (i = 0;i < messid.len;++i)
@@ -136,7 +158,7 @@ void getcmd()
 {
  int i;
  int r;
- char ch;
+ unsigned char ch;
 
  r = read(0,cmdbuf,sizeof(cmdbuf));
  if (r == 0)
@@ -154,17 +176,20 @@ void getcmd()
    switch(stage)
     {
      case 0:
-       delnum = (unsigned int) (unsigned char) ch;
-       messid.len = 0; stage = 1; break;
+       delnum = ch;
+       stage = 1; break;
      case 1:
+       delnum += (unsigned int)ch << 8;
+       messid.len = 0; stage = 2; break;
+     case 2:
        if (!stralloc_append(&messid,&ch)) flagabort = 1;
        if (ch) break;
-       sender.len = 0; stage = 2; break;
-     case 2:
+       sender.len = 0; stage = 3; break;
+     case 3:
        if (!stralloc_append(&sender,&ch)) flagabort = 1;
        if (ch) break;
-       recip.len = 0; stage = 3; break;
-     case 3:
+       recip.len = 0; stage = 4; break;
+     case 4:
        if (!stralloc_append(&recip,&ch)) flagabort = 1;
        if (ch) break;
        docmd();
@@ -175,12 +200,12 @@ void getcmd()
 
 char inbuf[128];
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
- char ch;
- int i;
+ unsigned char ch;
+ unsigned int i;
  int r;
  fd_set rfds;
  int nfds;
@@ -201,12 +226,23 @@ char **argv;
 
  initialize(argc,argv);
 
- ch = auto_spawn; substdio_putflush(&ssout,&ch,1);
+ ch = auto_spawn; substdio_put(&ssout,&ch,1);
+ ch = auto_spawn >> 8; substdio_putflush(&ssout,&ch,1);
 
- for (i = 0;i < auto_spawn;++i) { d[i].used = 0; d[i].output.s = 0; }
+ for (i = 0;i < auto_spawn;++i) {
+   d[i].used = 0;
+   d[i].output.s = 0;
+#ifdef DEBUG
+   d[i].log.s = 0;
+#endif
+ }
 
  for (;;)
   {
+   if (flagreinit) {
+     initialize(argc,argv);
+     flagreinit = 0;
+   }
    if (!flagreading)
     {
      for (i = 0;i < auto_spawn;++i) if (d[i].used) break;
@@ -236,24 +272,87 @@ char **argv;
 	   continue; /* read error on a readable pipe? be serious */
 	 if (r == 0)
 	  {
-           ch = i; substdio_put(&ssout,&ch,1);
+	   unsigned char c; c = i; substdio_put(&ssout,&c,1);
+	   c = i >> 8; substdio_put(&ssout,&c,1);
 	   report(&ssout,d[i].wstat,d[i].output.s,d[i].output.len);
 	   substdio_put(&ssout,"",1);
 	   substdio_flush(&ssout);
 	   close(d[i].fdin); d[i].used = 0;
 	   continue;
 	  }
+#ifdef DEBUG
+#	 define IS_LOG(x) ( d[(x)].used & 0x8 )
+#	 define LOGON(x)  ( d[(x)].used |= 0x8 )
+#	 define LOGOFF(x) ( d[(x)].used = 1 )
+	 {
+	  unsigned int j;
+	  unsigned int b;
+	  unsigned int t;
+	  for (j=0, b=0; j < (unsigned int)r; j++) {
+	    if (inbuf[j] == 15) {
+	      while (!stralloc_readyplus(&d[i].output,j-b)) sleep(10); /*XXX*/
+	      byte_copy(d[i].output.s + d[i].output.len,j-b,inbuf+b);
+	      d[i].output.len += j-b;
+	      LOGON(i);
+	      b = j+1;
+	    } else if ( inbuf[j] == 16 ) {
+	      while (!stralloc_readyplus(&d[i].log,j-b)) sleep(10); /*XXX*/
+	      byte_copy(d[i].log.s + d[i].log.len,j-b,inbuf+b);
+	      d[i].log.len += j-b;
+	      b = j+1;
+	      LOGOFF(i);
+	      if (truncreport > 100)
+		if (d[i].log.len > truncreport) {
+		  const char *truncmess = "\nError report too long, sorry.\n";
+		  d[i].log.len = truncreport - str_len(truncmess) - 3;
+		  stralloc_cats(&d[i].log,truncmess);
+		}
+	      ch = i; substdio_put(&ssout,&ch,1);
+	      ch = i >> 8; substdio_put(&ssout,&ch,1);
+	      ch = 'L'; substdio_put(&ssout,&ch,1);
+	      for (t = 0;t < d[i].log.len; ++t) if (!d[i].log.s[t]) break;
+	      substdio_put(&ssout,d[i].log.s,t);
+	      substdio_put(&ssout,"",1);
+	      substdio_flush(&ssout);
+	      d[i].log.len = 0;
+	    }
+	  }
+	  if (b == (unsigned int)r) continue;
+	  if ( IS_LOG(i) )
+	   {
+	    while (!stralloc_readyplus(&d[i].log,r-b)) sleep(10); /*XXX*/
+	    byte_copy(d[i].log.s + d[i].log.len,r-b,inbuf+b);
+	    d[i].log.len += r-b;
+	   }
+	  else
+	   {
+	    while (!stralloc_readyplus(&d[i].output,r-b)) sleep(10); /*XXX*/
+	    byte_copy(d[i].output.s + d[i].output.len,r-b,inbuf+b);
+	    d[i].output.len += r-b;
+	    if (truncreport > 100)
+	      if (d[i].output.len > truncreport)
+	       {
+		const char *truncmess = "\nError report too long, sorry.\n";
+		d[i].output.len = truncreport - str_len(truncmess) - 3;
+		stralloc_cats(&d[i].output,truncmess);
+	       }
+	   }
+	 }
+#else
 	 while (!stralloc_readyplus(&d[i].output,r)) sleep(10); /*XXX*/
 	 byte_copy(d[i].output.s + d[i].output.len,r,inbuf);
 	 d[i].output.len += r;
 	 if (truncreport > 100)
 	   if (d[i].output.len > truncreport)
 	    {
-	     char *truncmess = "\nError report too long, sorry.\n";
+	     const char *truncmess = "\nError report too long, sorry.\n";
 	     d[i].output.len = truncreport - str_len(truncmess) - 3;
 	     stralloc_cats(&d[i].output,truncmess);
 	    }
+#endif
 	}
     }
   }
+ /* NOTREACHED */
+ return 0;
 }

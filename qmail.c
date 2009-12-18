@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "substdio.h"
 #include "readwrite.h"
 #include "wait.h"
@@ -7,13 +8,34 @@
 #include "qmail.h"
 #include "auto_qmail.h"
 
+#ifdef ALTQUEUE
+#include "env.h"
+
+static char *binqqargs[2] = { 0, 0 } ;
+
+static void
+setup_qqargs(void)
+{
+  if(!binqqargs[0])
+    binqqargs[0] = (char *)env_get("QMAILQUEUE");
+  if(!binqqargs[0])
+    binqqargs[0] = (char *)"bin/qmail-queue";
+}
+
+#else
 static char *binqqargs[2] = { "bin/qmail-queue", 0 } ;
+#endif
+
 
 int qmail_open(qq)
 struct qmail *qq;
 {
   int pim[2];
   int pie[2];
+
+#ifdef ALTQUEUE
+  setup_qqargs();
+#endif
 
   if (pipe(pim) == -1) return -1;
   if (pipe(pie) == -1) { close(pim[0]); close(pim[1]); return -1; }
@@ -35,7 +57,44 @@ struct qmail *qq;
 
   qq->fdm = pim[1]; close(pim[0]);
   qq->fde = pie[1]; close(pie[0]);
-  substdio_fdbuf(&qq->ss,write,qq->fdm,qq->buf,sizeof(qq->buf));
+  substdio_fdbuf(&qq->ss,subwrite,qq->fdm,qq->buf,sizeof(qq->buf));
+  qq->flagerr = 0;
+  return 0;
+}
+
+int qmail_remote(qq, host)
+struct qmail *qq;
+char *host;
+{
+  int pim[2];
+  int pie[2];
+  char *(args[3]);
+
+  args[0] = (char *)"bin/qmail-qmqpc";
+  args[1] = host;
+  args[2] = 0;
+
+  if (pipe(pim) == -1) return -1;
+  if (pipe(pie) == -1) { close(pim[0]); close(pim[1]); return -1; }
+ 
+  switch(qq->pid = vfork()) {
+    case -1:
+      close(pim[0]); close(pim[1]);
+      close(pie[0]); close(pie[1]);
+      return -1;
+    case 0:
+      close(pim[1]);
+      close(pie[1]);
+      if (fd_move(0,pim[0]) == -1) _exit(120);
+      if (fd_move(1,pie[0]) == -1) _exit(120);
+      if (chdir(auto_qmail) == -1) _exit(61);
+      execv(*args,args);
+      _exit(120);
+  }
+
+  qq->fdm = pim[1]; close(pim[0]);
+  qq->fde = pie[1]; close(pie[0]);
+  substdio_fdbuf(&qq->ss,subwrite,qq->fdm,qq->buf,sizeof(qq->buf));
   qq->flagerr = 0;
   return 0;
 }
@@ -50,34 +109,34 @@ void qmail_fail(qq) struct qmail *qq;
   qq->flagerr = 1;
 }
 
-void qmail_put(qq,s,len) struct qmail *qq; char *s; int len;
+void qmail_put(qq,s,len) struct qmail *qq; const char *s; int len;
 {
   if (!qq->flagerr) if (substdio_put(&qq->ss,s,len) == -1) qq->flagerr = 1;
 }
 
-void qmail_puts(qq,s) struct qmail *qq; char *s;
+void qmail_puts(qq,s) struct qmail *qq; const char *s;
 {
   if (!qq->flagerr) if (substdio_puts(&qq->ss,s) == -1) qq->flagerr = 1;
 }
 
-void qmail_from(qq,s) struct qmail *qq; char *s;
+void qmail_from(qq,s) struct qmail *qq; const char *s;
 {
   if (substdio_flush(&qq->ss) == -1) qq->flagerr = 1;
   close(qq->fdm);
-  substdio_fdbuf(&qq->ss,write,qq->fde,qq->buf,sizeof(qq->buf));
+  substdio_fdbuf(&qq->ss,subwrite,qq->fde,qq->buf,sizeof(qq->buf));
   qmail_put(qq,"F",1);
   qmail_puts(qq,s);
   qmail_put(qq,"",1);
 }
 
-void qmail_to(qq,s) struct qmail *qq; char *s;
+void qmail_to(qq,s) struct qmail *qq; const char *s;
 {
   qmail_put(qq,"T",1);
   qmail_puts(qq,s);
   qmail_put(qq,"",1);
 }
 
-char *qmail_close(qq)
+const char *qmail_close(qq)
 struct qmail *qq;
 {
   int wstat;
@@ -87,7 +146,7 @@ struct qmail *qq;
   if (!qq->flagerr) if (substdio_flush(&qq->ss) == -1) qq->flagerr = 1;
   close(qq->fde);
 
-  if (wait_pid(&wstat,qq->pid) != qq->pid)
+  if ((unsigned long)wait_pid(&wstat,qq->pid) != qq->pid)
     return "Zqq waitpid surprise (#4.3.0)";
   if (wait_crashed(wstat))
     return "Zqq crashed (#4.3.0)";

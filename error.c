@@ -1,4 +1,3 @@
-#include <errno.h>
 #include "error.h"
 
 /* warning: as coverage improves here, should update error_{str,temp} */
@@ -93,3 +92,18 @@ EACCES;
 #else
 -13;
 #endif
+
+int error_range =
+#ifdef ERANGE
+ERANGE;
+#else
+-14;
+#endif
+
+int error_proto =
+#ifdef EPROTO
+EPROTO;
+#else
+-15;
+#endif
+

@@ -1,0 +1,1302 @@
+QMAIL_LDAP by Andre Oppermann <opi@nrg4u.com>,
+Claudio Jeker <jeker@n-r-g.com> and Boris Lutz <lutz@n-r-g.com>
+(c) 1999-2004 Internet Business Solutions AG
+
+RELEASE: $Date: 2005/04/01 14:10:30 $ ($Revision: 1.214 $)
+
+
+This is the NEWS FILE, so the QLDAPINSTALL file gets a bit cleaner.
+This file is NOT structured!!
+
+TODO:
+
+ see QLDAPTODO
+
+WARNING: If you are upgrading from 20030801a or earlier make sure that
+         you have read the news section for 20030901.
+
+NEWS for current stuff:
+
+ Enable logging in qmail-verify. It is not perfect but far better than
+ before.
+
+ Correctly escape the AUTH= extension according to RFC2554 in xtext form.
+ Initial idea and problem found by Aiko Barz.
+
+ Add -t type option to digest to specify a specific algorithm to be used.
+ This makes digest usable for scripting.
+
+ Correctly parse multiline ~control/ldapserver files. OpenLDAP seems to
+ be a bit finically about what it accepts.
+
+ Use correct original sender address if using one of the qmail-secretary
+ modes -- like the moderator support of qmail-group. Previously all bounces
+ were sended to the moderator okey-ing a message.
+
+ Fix bug in the EHLO response parser of qmail-remote. Looks like authentication
+ only worked on TLS encrypted sessions. Reported by Amol Kulkarni.
+
+ Use SSL_CTX_use_certificate_chain_file() instead of
+ SSL_CTX_use_certificate_file() to load the TLS certificates. With this it
+ is possible to load the complete certificate chain instead of just the first
+ one. Idea and patch by Michel Minsoul.
+
+NEWS for 20041201 stuff:
+
+ Introduce a better extension handling to qmail-group. Qmail-group will now
+ only deliver mails if they are sent to the main address. This should fix
+ possible mail-loops. Also the extension -moderators is now supported and
+ mails to that email will be sent to all moderators.
+
+ Introduce the new qmailGroup ldap attribute "bounceadmin". Bounceadmin is a
+ list of rfc822 mail addresses where delivery errors are sent to. If no
+ bounceadmin is specified then the original sender of the mail will be used.
+
+ qmail-reply sends mail with empty envelope sender as it does not make sense
+ to get bounces for automatic replies. Prodded by Andre who had over 1000
+ failure notices after his vacation.
+
+ Only update the qmail-reply recent sent db if we would send a mail to this
+ user. Before every sender was added to the db and caused massive trashing.
+
+ Bugfix in qmail-group to make filtermember/filtersender work when
+ membersonly is turned on. Previously users specified via a filter where
+ always considered not member of the group. Reported by Flavio Fonseca.
+
+ Fix qmail-group so that senderconfirm and moderation can be used togehter.
+ This fixes a problem where qmail-secretary detected a mail loop when both
+ options where used.  Reported by George Lekatsas.
+
+ Source ~control/{aliasempty,defaultdelivery} with cat instead of head -1
+ so it is possible to define more than just a simple ./Maildir/ delivery
+ as default. Found by Michel H.
+
+NEWS for 20041101 stuff:
+
+ Don't forget to check also for accountStatus deleted in the auth tools and
+ deny access in this case.
+
+ Only send the AUTH option in MAIL FROM: if the session is authenticated.
+ Fixes a problem seen with some obscure mail server.
+
+NEWS for 20040801 stuff:
+
+ In qmail-smtpd if SSLCERT is set use this as the path to the certificate and
+ not as the path to a file containing the path to the certificate. Noticed by
+ Zachary Kotlarek.
+
+ Fix a security bug in the startup scripts. qmail-smtpd is run under the
+ user $USER. If $USER was set on invocation of the script, the value was not
+ reset to the default qmaild. In the worst-case qmail-smtpd was running as
+ root. Yikes! To install the new script you need to remove the old one before
+ make setup check. Also affected are the qmail-pbsdbd and qmail-qmqpd
+ run-scripts.
+
+ Fix a bug in smtp_auth handling where empty password caused a disconnect.
+ Noticed by Fabio Gomes.
+
+ Fix multiple bugs in qmail-smtps starttls handling. Noticed by Ted Zlatanov.
+
+NEWS for 20040701 stuff:
+
+ qmail-smtpd log level cleanup. Add a additional level for accounting and
+ remove some redundant messages.
+
+ Fix a bug in checkpassword.c that caused auth_pop and auth_imap to ignore
+ the per user quota if rebind was used. Reported by nbari at unixmexico.com
+
+ Add ~control/remotecert for qmail-remote similar to ~control/smtpcert
+ for qmail-smtpd. The big difference is that qmail-remote will use STARTTLS
+ and SSL encryption even without this file as a certificate is optional for
+ the client side. 
+
+ To enable SMTP STARTTLS the path to the cert file needs to be set in
+ ~control/smtpcert or set via the env var SSLCERT.
+
+ If the defaultdelivery aka aliasempty is not a local delivery qmail-local
+ may start additional programs while running qmail-reply. Reported by
+ Florian Pflug.
+
+ Fix the SIGHUP handling between qmail-send and qmail-local.
+
+ Messages sent from a moderator to a group only need to be approved by the
+ moderator himself.
+
+ qmail-todo started to spin if qmail-send exited non nicely (aka crashed).
+
+ Fix some path and 'sh' issues in the run scripts reported by Toni Mueller 
+ and Ted Zlatanov. While doing that add some ssl run scripts.
+
+ Fix QUOTATRASH option by including LDAPFLAGS to the maildir++.o target.
+ Reported by Zachary Denison.
+
+ Replaced the cdb functions with the public domain mmaped version from
+ tcpserver. This makes it possible to keep the file open and do extremly
+ fast searches.
+
+ Add license to files that are under our (Andre or mine) copyright. At least
+ it is now clear what is our stuff and what is coming from djb.
+
+NEWS for 20040401 stuff:
+
+ Added some qmail-group docu. See QLDAPGROUP.
+
+ Better 550GREETING support and added an additional 421GREETING mode to
+ qmail-smtpd.
+
+ Qmail-secretary should ignore mails with precedence set to list, junk or bulk.
+
+ Added Bruce Guenters qmail-qmqpc connect timeout patch.
+
+ Add SMTP AUTH support to qmail-remote. A user can be specified via
+ ~control/smtproutes. To authenticate all mails to inside.af.mil with
+ user joe-user something like this can be used.
+   inside.af.mil:firewall.af.mil joe-user eat@joe's
+
+ Don't let qmail-group or qmail-secretary inject mails with no recipients.
+
+ Print remote IP address in error messages for RBL rejects and denied
+ relaying attempts to make debugging based on the bounce messages far
+ easier.  Requested by Jason Eggleston.
+
+NEWS for 20040301 stuff:
+
+ Fix buffer overflow noticed by Georgi Guninski in qmail-qmtpd.c.
+ There is no easy way to exploit it. Additionally the same issue is
+ patched in qmail-qmqpd.c.
+
+ Fix an issue in qmail-remote.c with TLSDEBUG defined. Noticed by
+ Oskar Eyb and Rainer Hartenthaler.
+
+ Fix bugs in qmail-group. The moderation feature was broken and in some
+ header fields a char of the local address was chopped of. Noticed by
+ different people.
+
+ Fix endless loop in qmail-ldaplookup noticed by Tomas Kuliavas.
+
+ Fix bug in substdio_feed noticed by Stefan Paletta.
+
+ Fix qmail-inject -f "" bug noticed by Mesa de Ayuda.
+
+ Added LDAPFLAG -DBIND_8_COMPAT needed on systems with new incompatible
+ bind9 header files. Currently this is necessary on MacOS X 10.3.
+
+ Disable the too generic zip blocker signature in the example signature file.
+
+NEWS for 20040201 stuff:
+
+ Yet another bug fix in the maildirmake code of auth_mod.c. The previous fix
+ was definitifly not strong enough,
+
+ Bug fix in condwrite. The maildir child should not exit 99 on finish the
+ parent should exit 99 and the child 0.
+
+ In qmail-smtpd limit the accepted text line lenght to 10000 characters.
+ The RFC proposes a maximum of a 1000 but be nice to broken MTA/MUAs and it
+ does not really hurt us.
+
+ Enhanced qmail-smtpd execcheck. Basic idea is form Russel Nelsons
+ qmail-smtpd-viruscan-1.3 patch. MIME signatrues are now stored in the control
+ file ~control/signatures. Two enhancements where done to Russels patch.
+ First MIME forwarded messages are also completly scanned and secondly it is
+ possible to use a '*' in the signature as a anymatch character. This makes
+ the signatures more powerful.
+
+ It is now possible to limit the allowed senders to a qmail-group with
+ dnsender, rfc822sender and filtersender similar to dnmember, rfc822member
+ and filtermember. If membersonly is enabled and one of those sender attributes
+ is used only mails comming form this list of senders are passed to the group.
+
+ Ensure qmail-remote does not print the DDC percentage in error messages.
+
+ Add auto maildirmake capability to qmail-secretary.
+
+ qmail-verify, auth_smtp, qmail-group and qmail-ldaplookup only try to read
+ ~control/ldaplogin and ~control/ldappassword. If one of the files can not be
+ read use anonymous login or the alternate login credentials in case of
+ qmail-group and qmail-ldaplookup. 
+
+ Yet another cleanup round through the whole code. Fix many issues with integer
+ overflows inclusive the qmail-smtpd crash found by Georgi Guninski.
+ While doing that rename puts and log to putstr and logit so that it does not
+ conflict with gcc internals.
+
+ Bugfix in auth_mod.c reported by em (at) cmla.ens-cachan.fr
+
+ Yet another run script update. $ALIASEMPTY fix from Jo Geraerts and correct
+ $QMAIL idea from Ace Suares.
+
+ Do the same game in Makefile.cdb. Prepend %QMAIL%/bin infront of qmail-cdb.
+
+ Fix typo in qmail-secretary. Reported by Beni Schoedler.
+
+NEWS for 20040101 stuff:
+
+ Never fdcopy STDOUT with STDERR in qmail-popup. The copy was only skipped if
+ DEBUG was set. So it was not possible to use qmail-pop3d accounting/logging
+ if a non-DEBUG version was compiled. Report by Henning Brauer.
+
+ Once again I missed something in the run scripts. It would be good to run
+ awk scripts with awk. Remember to remove the old run scripts before a
+ make setup check.
+
+ Kill the qmail-verify zombies in qmail-smtps call infrastructure. Reported
+ by Kevin J. McCarthy.
+
+ auth_pop and auth_imap used always the default quota settings because
+ the quota attributes for the ldap search where missing. Thanks to Ricardo
+ Cerqueira for the report.
+
+ The envdir parsing in the runscripts was absolutly broken. First of
+ all I used a C-Style comentary in a shell script and then the simple
+ eval `env - envdir ./env env` does not work with environments with
+ spaces. So this was exchanged through a simple awk script. Fixed some
+ other runscript bogons too.
+ To install the new run scripts the old ones need to be removed `rm
+ /var/qmail/boot/*/run`
+
+NEWS for 20031201 stuff:
+
+ Do not overwrite rules file on new install (make setup check).
+
+ Make it possible to specify the number of concurrent connection of tcpserver
+ controlled daemons (qmail-smtpd, qmail-qmqpd, qmail-pop3d, qmail-imapd).
+ This can be achived by setting the CONCURRENCY environment variable.
+
+ qmail-reply does no longer reply to messages tagged with a spamassassin
+ "X-Spam-Status: Yes" header.
+
+ The dynamic data compression done in qmail-qmqpd can be explicitly disabled.
+ If the environment variable NOCOMPRESS is set the feature is disabled.
+
+ Sending a SIGHUP reloads now also the qmail-lspawn config. Sending a
+ SIGHUP directly to qmail-lspawn is no longer supported. qmail-send sends
+ upon receipt of a SIGHUP a empty message with delivery number 0xBEEF (48879)
+ to the qmail-lspawn process. This may cause trouble if you have a concurrency
+ bigger than this. The code should work even with higher values but I'm not
+ able to test this.
+
+ qmail-reply should clear the database if the reply text changes. So that
+ you get a new message after the change.
+
+ Fix in check.c:sanitypathcheckb(). Until now .. where not allowed in a
+ path. Now we check for the real thing(tm) "/../" and "^../".
+
+ Case sensitivity bug fix when using locals.cdb. While constmap uses case
+ insensitive compares cdb doesn't, this will cause trouble when using local.cdb
+ and the envelope recipient has uppercase letters in the domain part.
+ Thanks to Doug Council for the report.
+
+ Do not touch "down" files in service dirs on install else we would disable a
+ already enabled service without the knowledge of the user.
+
+NEWS for 20031101a stuff:
+
+ Nasty bugfix in qmail-qmqpd with compression turned on. On slow links large
+ mails could cause a transmission error.
+
+ Minor bug fixes in passwd.c, qmail-remote.c, qmail-smtpd.c and rcpthosts.c.
+ Thanks Toni Mueller, Vicente Aguilar and Neil Sequeira for the reports.
+
+NEWS for 20031101 stuff:
+
+ Basic daemontool run scripts installed in ~/boot. qmail-ldap installs now
+ daemontools run script for most services in ~/boot. A Makefile for cdb
+ updating is installed in ~control.
+
+ locals and rcpthosts can now be stored as cdb. This makes morercpthost.cdb
+ superfluous, also the hupping of qmail-send if the locals.cdb file changes
+ is no longer neccesary. If locals.cdb is present locals is ignored respectively
+ if rcpthosts.cdb is present rcpthosts and morercpthosts.cdb are ignored.
+
+ Important bug fix: if you removed rcpthosts, qmail-ldap became a open relay.
+ This is stock qmail behaviour but since we include locals in our rcpthost
+ check this old assumption is wrong. We also consider the stock qmail behaviour
+ as a design flaw because a mta should never be a open relay unless the 
+ luser want's so.
+
+ readwrite cleanup. Similar to other djb ware we wrap read() and write()
+ into the functions subread() and subwrite(). This solves the 64-bit troubles
+ with read and write. read() and write() should no longer be used together with
+ the substdio framework.
+
+ Huge cleanup. Bring qmail into the 21st century. Define all prototypes
+ and include the needed system include files. This commit fixes about 99%
+ of all compiler warnings and makes code developing lesser error-prone.
+ The Makefile dependencies need to be updated to reflect reality.
+ A few errors are still in the tree which are either hard to solve or
+ considered harmless -- mainly return type of main() in a few helper apps.
+ This cleanup brought some strange bugs to light which are now fixed.
+
+ Finally enabled the "send only one reply to each sender" feature
+ in qmail-reply.
+
+ Critical bugfix in auth_imap.c. A bug in the function that should invoke
+ the next authmodule caused auth_imap to end up in one infinit loop.
+
+ Add DUPEALIAS feature. When duplicate or overlapping mail or
+ mailAlternateAddress exist the mail will be forwarded to this local
+ user (like the alias user of qmail). It can be either bounced or
+ handled there with a script/program answering with some meaningful
+ reply. This compile time option is intended for migration of old
+ X.400 mail systems where a user was available under some short names
+ if nobody else had the same shortname.
+
+ Add some more features to qmail-ldaplookup. Password compare works now.
+ It is now also possible to use a different binddn and bindpw.
+ What is missing are local /etc/passwd lookups and group handling.
+
+ The objectclass of a group object can now be changed like all other ldap
+ values via qmail-ldap.h.
+
+ Fix in the qmail schema definitions: a ')' was missing.
+
+NEWS for 20031001 stuff:
+
+ Change NOPOP in accountStatus to NOACCESS as it is not just disabling
+ pop access but also imap and possibly others.
+
+ ~control/ldapserver is now read with control_readfile. Multiple servers
+ now have to be specified at one per line. Using # for comments is allowed
+ and empty lines are removed.
+
+ qmail-smtpd now reads ~control/locals and merges this with ~control/rcpthosts.
+ It is no longer neccessary to list a domain in both files. Anything listed
+ in locals is now automatically accepted by qmail-smtpd. rcpthosts is only
+ used and needed for domains we have to do spooling for.
+
+ New compile time option IGNOREVERISIGN to disable dns wildcard matches
+ on gtlds. With this the return mx check will work again with .com domains.
+ This version can also handle multiple A records. A big hurray to verisign
+ who added this broken feature to the internet.
+
+ Added auth_smtp and AUTH capabilities to qmail-smtpd. Enabled via the 
+ SMTPAUTH env var. If SMTPAUTH is set to TLSREQUIRED it is neccesairy to
+ do a STARTTLS before issuing an AUTH command. If AUTHREQUIRED is set any
+ user MUST successfully authenticate before issuing a MAIL FROM command.
+ The string in the env var AUTHPREPEND will be prepended to the userid in
+ the received line.
+
+ New tool qmail-verify which is used for email address verification. See
+ next two new features.
+
+ smtp recipient verify. This qmail-smtpd feature will look up every RCPT TO
+ address in ldap with qmail-verify to check the recipients existance. If it
+ does not exist, qmail-smtpd will answer directly with a 550 reply instead
+ of accepting the email and bouncing it later. Only addresses whose domain
+ part is listed in ~control/locals are checked (because only there we know
+ the definite answer). Relaying and rcpthosts works as before, recipient is
+ not checked for those. Addresses listed in new ~control/goodmailaddr will
+ be accepted in any case. This is very useful for important or special
+ (like postmaster or mail admin) addresses which must work under any
+ circumstances (or local addresses which are not in ldap). Enabled with
+ RCPTCHECK env var.
+
+ smtp sender verify. This qmail-smtpd feature will look up every MAIL FROM
+ address in ldap with qmail-verify to check the senders existance. If it
+ does not exist, qmail-smtpd will reject with 550 reply. In normal mode
+ only (envelope) senders whose domain part is listed in ~control/locals
+ are checked. Otherwise no-one else from outside could send mail to local
+ users anymore. In mode LOOSE it will only allow verified sender plus any
+ sender with its domain listed in ~control/rcpthosts. In STRICT mode it
+ will allow only ldap verified senders. With this you can, for example,
+ enforce that users within your network must use a valid sender which
+ exists in ldap and no other. Addresses listed in new ~control/goodmailaddr
+ will be accepted in any case. This is very useful for important or special
+ (like postmaster or mail admin) addresses which must work under any circum-
+ stances (or local addresses which are not in ldap). Enabled with SENDERCHECK
+ env var.
+
+ 550greeting to reject smtp connections right away in the smtp
+ greeting message. Use this to permanently reject all messages coming
+ from a particular ip address(range).
+
+ smtpclustercookie feature for (large) smtp MX clusters behind load
+ balancers or NAT devices. The cookie is presentented in the smtp
+ greeting as last string before \r\n. qmail-remote compares the
+ cookie with it's own and if they match assumes that the message
+ is looping. Cookies are set in ~control/smtpclustercookie. Length
+ is limited to 32 characters. Fill with some random printable chars.
+
+ qmail-smtpd now prints its hostname (~control/me) along with QP
+ when acking a message. Makes it easier to track which smtp MX cluster
+ member took the message.
+
+ qmail-smtpd greeting restructured due to the above things. It now
+ prints "220 [~control/me] ESMTP [~control/smtpgreeting] [~control/
+ smtpclustercookie]\r\n". You don't have to put the hostname of the
+ machine into smtpgreeting anymore. It is just a text. Can be empty.
+
+ qmail-qmqpd supports now both clear and ZLIB compressed communications
+ for intra-cluster forwards.
+
+ Added new tool condwrite. Works like condredirect but writes to a maildir
+ or mailfile instead of forwarding. The quota is respected and maildir are
+ created automatic if option is set. NOTE: The automatic maildir creation
+ is not capable to create valid IMAP subdirs (Maildir/.somedir).
+
+ auth_* sets now the MAILDIRQUOTA and DATASIZE environment vars.
+
+ New compile time option QUOTATRASH to include the Trash in the quota
+ calculation. The courier-imap secification tells explicitly to ignore
+ .Trash but in the last few weeks I had to find out that the courier
+ documentation should not be respected, because courier does not respect
+ it either.
+
+ qmail-reply will no longer send replies to mails tagged with a X-RBL header.
+ This should dramaticaly reduce reply bounces if used with the proper RBL.
+
+ Announce the EHLO STARTTLS option only if tls is compiled, enabled and
+ we have found a valid certificate in ~control/cert.pem for encryption.
+
+ Modernize qmail startup infratructure. First step is to redo the ~boot
+ directory and to add ~log directory. Create subdirs for qmail, qmail-smtpd,
+ qmail-qmqpd, qmail-pop3d, qmail-imapd and qmail-pbsd for supervise and
+ multilog.  Corresponding run files will come in the next release.
+
+ Fix bug in qmail-smtp addrparse function. If "mail from" or "rcpt to" did
+ neither contain a '<' nor a ':' the function returned a nullsender (bounce)
+ or recipient instead of a syntax error. This bug is also present in stock
+ qmail-1.03.
+
+ The copyloop used to forward pop3 and imap session can be simplified.
+ Neither pop3 nor imap are protocols which support half close so dump this
+ stuff. Half closing those forwarding sessions could be used as a DOS attack.
+
+ qmail-todo could end in an infinite loop if qmail-send died before sending
+ the synchronization flag. This can happen if qmail-lspawn died because of
+ a missing control file.
+
+ Print the dynamic data compression message in qmail-remote only if compressed
+ data was sent. Otherwise we get some junk number.
+
+ Fixing clustering. The cluster forwarding was broken during the rewrite
+ (20030901).
+
+ Fix error handling of qmail-quotawarning startup in qmail-local.
+
+ Bug fix in qldap_get_status reported by <krits at home dot pl>.
+
+ Removed some unneccesary verbositiy in qmail-secretary.
+
+ Bug fix in the maildir string creation. A specified count value will over-
+ write any size settings. Thanks to Neil Sequeira for reporting this issue.
+
+ SHADOWLIBS added in the digest link rule.
+
+ bug fix in auth_imap. courier-imap login program which is invoking
+ auth_imap did not adhere to its own specs and sends too much stuff.
+
+
+NEWS for 20030901 stuff:
+
+ WARNING: This release is NOT fully backwards compatible! We have made
+ certain changes for clarity and cleanup.
+
+ qmail-group added. This tool handles mailing groups stored in ldap. Members
+ can be defined as rfc822 addresses, via dn entries and via ldap filters.
+ qmail-group can restrict mails togheter with qmail-secretary. So it is
+ possible to moderate a list, to restrict the sender to be a list member or
+ to confirm each message (qsecretary).
+
+ qmail-ldaplookup has been rewritten. Not all functionality of the old tool
+ has been integrated yet. It is now possible to use search filters and to
+ show multiple entries.
+ 
+ Removed some qmail-smtpd control files (tarpitcount/delay, maxrcptcount,
+ rblonlyheader). The only and right way to set them is environment variables
+ with tcpserver.
+
+ Changed deliveryMode significantly. Before the setting of a forwarding
+ would have disabled local delivery. This is no longer the case. Each of
+ the modes has to be explicitly disabled (local, forward, program) or
+ enabled (reply). There are no longer contradicting modes which makes it
+ much more logical.
+ This change probably has a great impact on many administrative frontends!
+
+ Quota definitions are new format only. ~control/ldapdefaultquota and mailQuota
+ serve no meaning anymore. Also the string quota format (10000S,100C) is no
+ longer supported. Use ~control/defaultquota[size|count] and mailQuotaSize
+ and mailQuotaCount instead.
+
+ New tool qmail-secretary. This is the swiss army knife for mail group and
+ mailing list handling. It is used by the upcoming qmail-group tool but has
+ a compatibility modus for ezmlm (you may guess why ...).
+
+ New tool qmail-forward. This tool forwards a mail via qmail-qmqpc in a
+ much nicer way than qmail-lspawn befor. Some more or less ugly hacks could
+ be removed.
+
+ qmail-reply recent sender support finished. The code is still disabled
+ via NOTYET defines until I verified it.
+
+ The mailheader magic of qmail-reply is now also supported by qmail-ldaplookup
+ and qmail-secretary.
+
+ Fixed some problems with text control files, mainly quotawarning and
+ custombouncetext. Trailing white spaces and empty lines are no longer
+ cleared.
+
+ Rewrite of the homedirmake and maildirmake feature. Finaly auth_imap will
+ create the maildir for courier.
+
+ The environments passed between qmail-lspawn and qmail-local are now ':'
+ seperated and escaped. Nota bene the old csv stile definition of some
+ attributes mainly deliveryMode is still supported (the ',' are replaced
+ by ':' automagically).
+
+ major cleanup in qmail-lspawn ldap handling and exit-code handling code.
+ Also the forwarding code has been moved out so that this code is no longer
+ run under root.
+
+ NOPBS environment variable can now be used to disable pbsadd. This is useful
+ for nat-ed customers or if you have some local port forwarding and absolutly
+ neccessary for clusters (NOPBS set for all clusterhost IPs).
+
+ Integration for pbs tools in cluster environments. auth_* has a switch -d
+ to specify pbsadd or a other tool that is executed in all success cases be
+ it local access or session forwarding. The old way via chaning the processes
+ still works for non cluster setups.
+
+ new auth_pop, auth_imap and checkpassword implementation. The files are
+ now better seperated so that it should be possible to implement auth_smtp
+ without copying most of the auth* code. It is now possible to run the auth_*
+ tools without root priviledges and root priviledges are dropped as soon as
+ possible.
+
+ Salted versions of SHA and MD5 (SSHA and SMD5) implemented and major cleanup
+ of the hole passwd compare functions. The digest tool has been rewritten to
+ support the new algorithms and to support passwd verifying. Also the base64
+ and digest_* implementations have been cleaned up and stripped.
+
+ new and better structured ldap backend. This solves many issues we had
+ with the old hackish implementation. These are: functioning rebind, support
+ for multiple concurrent connections, more flexible support for ldap attribute
+ handling and upcomming filter functions that can handle mutliple results.
+
+ compile time option to enable ZLIB compression for QMQP cluster communication.
+ This is useful when cluster hosts are in different locations and have slow
+ or metered connections between them. All QMQP client/servers need to be
+ support the dynamic data compression, stock QMQP and compressed QMQP are
+ unable to understand each other. This may change for the server but not for the
+ client.  Enable in Makefile with -DQMQP_COMPRESSION switch.
+
+ cleaned up qmail.schema and added qmailGroup objectclass for mail groups.
+
+ major cleanup, actually a huge cleanup, currently over 75 modified, removed
+ or added files. The code is now much more modularized and protable.
+
+NEWS for 20030801 stuff:
+
+ Removed checking of client certificates from TLS in qmail-smtpd. It is
+ no longer possible to allow automatic relaying via TLS client certs.
+ TLS functionality for transport is not affected and continues to be
+ fully functional.
+
+ Some cleanup and clarification in smtpd and rbl logging.
+
+ Added Russell Nelsons antivirus patch for qmail-smtpd.
+ Compile qmail-ldap with the -DSMTPEXECCHECK option and turn it on with
+ the REJECTEXEC environment variable.
+
+ Added qmail-queue patch. Compile-time option via -DALTQUEUE.
+
+ On-the-fly SMTP session data compression via ESMTP DATAZ extension.
+ Saves a damn lot of bandwidth. This is currently draft. See
+ draft-oppermann-smtp-datacompression-00.txt.
+
+ Bug fix in Makefile (qmail-todo dependencies).
+
+ Better handling of SMTP mail-parameters mainly SIZE. Until now only the first
+ mail-parameter was used all others where ignored. Also specially escaped
+ or quoted mail addresses could result in strange outcomes.
+
+ New control/rbllist parser, it is no longer needed to use one tab as
+ separator. Lines starting with a # are comments and will be ignored.
+
+ New delivery mode noforward to disable all forwarding entries in ldap
+ and .qmail. The deliveryMode attributes need some major overhaul becasue
+ we have a few modes -- manly forwardonly, noforward, localdelivery,
+ normal and nombox -- that are exclusive. Anyway for now this should make
+ life a bit easier.
+
+ qmail-remote tries now higher MX servers if the previous server temporary
+ fails in the HELO/EHLO command exchange. >=500 errors result in a delivery
+ error.
+
+NEWS for 20030501 stuff:
+
+ gcc bug fix for OpenBSD sparc64 in digest_sha.c
+
+ Better copy loop in checkpasswords imap/pop3 forwarding this should solve
+ problems with large file downloads over imap.
+
+ Remove duplicate entries from pbsdbd cache, this should solve the "hash
+ flodding" error message.
+
+ Bug fix in rbl.c from Sami Farin.
+
+ Bad handling of return values. Per RFC a EHLO may return a 500, 502 or 
+ perhaps a 504. In this case retry with HELO.
+ Update: Some servers send some non RFC compliant error code so retry
+ with HELO in all cases.
+
+NEWS for 20030401 stuff:
+
+ Added big todo patch. Enable with -DBIGTODO in Makefile.
+
+ qmail-remote has a better look at the return codes of the helo/ehlo command.
+ This gives a better error handling in case of server that refuse the
+ connection with a >500 error in the begining.
+
+ qmail-local bug fix in .qmail parser (missing () around a ||).
+
+ Be more careful with closedir(). It is possible that the dirp is NULL.
+
+ Nasty bug fix in qmail-qmqpc.c. Due to this it was impossible to use 
+ qmail-qmqpc.
+
+NEWS for 20030301 stuff:
+
+ qmail-showctl updated so that all new control files are listed.
+
+ qmail-remote and qmail-qmqpc are now capable to bind to a specified port
+ for outgoing connections. You can use control/outgoingip and control/qmqpcip
+ to set the ip.
+
+ For ISP that need to implement some surveillance method because of some
+ beloved authoroties (like here in switzerland), we added the
+ BIGBROTHER switch. This enables a per address queue extra feature.
+ Just put a key pair like badguy@badplace.ch:bigbrother@admin.ch in
+ ~control/bigbrother to automaticaly forward all mail to or from
+ badguy to bigbrother. bigbrother can be a local, ldap or remote address.
+
+ Bug fix in qmail-local: flagforwardonly was set to 0 instead of 1 if 
+ deliverymode was forwardonly.
+
+ Bug fix in maildir++ code: At two places a closedir was missing. Thanks to
+ Reinin Oyama.
+
+ Bug fix because of a gratuitous recycling of a var in qmail-quotawarn if
+ the DOTMODE_NONE was used. Thanks to Chris Maxwell.
+
+ Don't print extended received header if the needed infos are not available.
+ This is for qmtp receives. Idea by Chris L. Mason.
+
+ Many bug fixes and enhancements in the NOTYET code of qmail-reply, inspired
+ by Neil Sequeira.
+
+NEWS for 20030101 stuff:
+
+ Retry the ldap_bind with LDAPv2 if ldap_bind fails with LDAP_PROTOCOL_ERROR.
+ This solves a problem with OpenLDAP > 2.0 client libs and a OpenLDAP 1.2
+ Server. Inspired by Henning Brauer.
+
+ New qmail-reply program. Now it is possible to define a header section
+ with %HEADER%. With this change it is possible to define special Content-type
+ and Content-Transfer-Encodings.
+
+ Bug fix in qmail-lspawn: LDAP_MAXMSIZE = 0 should be eq unlimited.
+ Thanks to Henning Brauer.
+
+ Finally added pop3d logging similar to the smtpd logging.
+
+ Added the badmailfrom-unkown feature from Maex (via Henning Brauer).
+
+ Added a fix in qmail-ldaplookup.c. Thanks to Kosh Naranek for the report.
+ 
+NEWS for 20021201a stuff:
+
+ Hot fix in qmail-local. If no quota was specified accounts with mailforwarding
+ didn't work.
+ 
+ Close directory file handle in pbsadd and pbscheck.
+
+ Nicer exit behaviour in qmail-todo (exit 0 if no error encountered).
+
+ Add caseIgnoreIA5SubstringsMatch for mailAlternateAddress in qmail.schema.
+ 
+NEWS for 20021201 stuff:
+
+ On exit qmail-todo behaves now like qmail-[rl]spawn and stays alive
+ until qmail-send exits. All zombies have been slayered.
+
+ On a -HUP qmail-send rereads more ~control files. Now bouncemaxbytes,
+ custombouncetext, locals and virtualdomains are reloaded.
+
+ There seems to be a tiny bug in qmail-1.03 qmail-clean program. Fixed.
+
+ Renamed QMAILQUOTA to MAILDIRQUOTA to work better with maildrop.
+
+ Bug fix in qldap-ldaplib.c, when the ldap lookup timed out the wrong error
+ was returned.
+
+ Minor bug fixes in the pbs tools inspired by Junjiro Okajima.
+
+ Don't use NULL in maildir++.c because it is often not defined.
+
+NEWS for 20021101 stuff:
+
+ New ldap fields added:
+ - mailQuotaSize and mailQuotaCount replace the cryptic mailQuota string.
+   mailQuotaSize specifies the maximum size in bytes and mailQuotaCount
+   is the maximum number of messages allowed.
+   Note: the old mailQuota string is still valid and used if neither 
+         mailQuotaSize nor mailQuotaCount are set.
+ - mailSizeMax specifies the maximum size of a single message the user may
+   receive. e.g. Dial-up customer prefer a small mailSizeMax.
+   Note: mailSizeMax is used in qmail-lspawn whereas databytes sets the
+         SMTP DATA limit. Therefor having a mailSizeMax bigger than databytes
+         does not make much sense.
+ The old mailQuota way of doing things is still supported.
+
+ Fixed some bugs and cleand up maildir++.c. The maildirsize parser is now
+ rock solid and does no longer freak out when lines start with spaces as in
+ the newer courier-imap releases.
+
+ quota_check() returns now also percentages over 100% (if over quota) and
+ the percentages calculation does not overflow with sizes over 40MB.
+ NOTE: quotas with sizes of around 4GB may overflow if large mails are
+ delivered and so the maildir size may get far over quota. This is a bug
+ and will get fixed somewhen (switch to 64bit quota numbers).
+
+ maildir++ quota API cleanup. quota_recalc() works now exactly like
+ quota_calc().
+
+ In qmail.schema 'ProgramDeliveryPath' was incorrectly specified as 
+ SINGLE-VALUE. Thanks to <andreas.schulze@web.de> for finding it.
+
+NEWS for 20021001 stuff:
+
+ Corrected qmail.schema contributed by Mike Jackson.
+
+ Documentation bug in POPBEFORESMTP fixed.
+
+ Add LDAPv3 protocol support.
+
+ Synchronize the external processor qmail-todo with qmail-send on startup.
+ There was a race condition on startup which caused some mails to be deliverd
+ twice.
+
+ In both auth_* tools the forwarding code was only sending a CR instead of
+ the needed CRLF.
+
+ Little fixes in the pbs tools.
+
+NEWS for 20020901 stuff:
+
+ Fixed bugs in pbscheck and pbsadd which caused unexpected behaviour if
+ multiple servers where specified.
+
+ Fixed multiple bugs in maildir++ quota handling.
+   bug in read5120(), if open failed it could cause a loop.
+   bug with handling of subdirectories (path concatenation).
+   bug with interpretation of quota strings for courier 0C means
+   no files allowed whereas for qmail-ldap it was unlimited.
+
+ Fixed some spelling errors.
+ 
+ Bugfix in auth_imap. The procedure for failed logons had a bug.
+
+NEWS for 20020801 stuff:
+
+ Fixed an error in the patch file.
+
+NEWS for 20020701 stuff:
+
+ Fix in qmail-reply: the wrong Return-Path was set because an interference of
+ qmail-locals environment and qmail-injects use of it. ($USER is used in
+ the Return-Path)
+
+ In both auth_* tools the forwarding code was sending LFCR instead of CRLF.
+
+ Fix buffer overflow in qmail-quotawarn.c. I changed the filename generation
+ without resizing the file name buffers, shame on me. 
+ NOTE: This overflow can not be exlpoited.
+
+ better handling of virtual/ldap .qmail handling.
+ The ldap .qmail arguments are now exected in the following way:
+   1. reply (deliveryMode: reply)
+   2. delivery programs (deliveryProgramPath)
+   3. forwards (mailForwardingAddress)
+   4. localdeliver (deliveryMode: localdelivery)
+ So it is possible to use a filter delivery program or other more complex
+ delivery options.
+
+NEWS for 20020501a stuff:
+
+ bounce messages are now qsbmf-compliant, wether custombouncetext is set or
+ not. Note that you may not have blank lines in custombouncetext.
+ Thanks to Henning Brauer for the patch and to Mike Jackson <mjj@pp.fi> for
+ the report.
+
+ The pop-before-smtp tools now support transaction of additional environment
+ variables. See POPBEFORESMTP for more info.
+
+ Use real rfc822 timestamps and more Maildir stile filename in qmail-quotawarn. 
+ This should fix order problems in mailclients.
+
+NEWS for 20020501 stuff:
+
+ ****** ATTENTION the format of ~control/rbllist has changed, see ******
+        QLDAPINSTALL for information about the new rbllist file.
+
+ Major overhaul of qmail-smtpd. Completely restructured anti-spam stuff and
+ replaced DENYMAIL environment variable (settable through tcpserver) with:
+  - SMTP550DISCONNECT to disconnect the smtp session immediatly after a fatal
+    5xx error
+  - NOBOUNCE to reject null sender bounces
+  - SANITYCHECK to reject messages without @, no . in TLD, too short/long TLD
+  - RETURNMXCHECK to check if the sender has an MX
+  - BLOCKRELAYPROBE to block rcptto containing !%@ before @ from Russell Nelson
+  - RBL to check RBLs
+  - RBLONLYHEADER to only add a X-RBL header
+
+ added bouncemaxbytes patch:
+ to turn it on write the amount of bytes to bounce in the file 
+ ~control/bouncemaxbytes.
+ Work inspired and mostly copied from Frank DENIS aka Jedi/Sector One.
+
+ Bug fix in qmail-send.c log handling:
+ If in one read a log entry and a delivery status notification was delivered the
+ status notification was dropped and therefor qmail-send did not close the job.
+
+ qmail-remote supports the smtp size extension as specified by rfc 1870.
+ If the EHLO extension size is set qmail-remote sends size in the mail from
+ commando. It does not parse the EHLO size argument to check if the size is
+ OK, the remote smtp server should decide if it is OK.
+
+ clean up in qmail-remote, the starttls option was not compared in a case
+ independend way as defined in rfc 2821. The tls debug option is now called
+ TLSDEBUG.
+
+ added Russ Nelson patch to qmail-remote to send using QMTP.
+ From his patch:
+  This patch to qmail-remote causes it to attempt qmtp first if the MX priority
+  indicates so.  Read http://cr.yp.to/proto/mxps.txt for more information.
+  If you want this qmail-remote to be able to send email to you using qmtp,
+  then you should be running a qmtpd on port 209, and you should have your
+  lowest MX priority be 12801.
+
+ added pop-before-smtp tools (see POPBEFORESMTP for more info).
+
+ reject any null sender (bounce) smtp session with more than one rcpt-to
+ (based on an idea of Charles Cazabon and some code of Henning Brauer)
+
+ updated QLDAPINSTALL (more about those nasty -lresolv and ld.so problems)
+
+ beautified the output of the recieved line (added an additional linebreak)
+
+ Add a precedence bulk header when we forward a message to more than one
+ recipient. So auto-reply programs at the recipients will not answer such
+ mails. A message forwarded to more than one recipient is now considered
+ a mailing list email.
+
+ Add an external TODO processor program. This moves the queue todo processing
+ out of qmail-send to avoid the silly qmail syndrome with high injection rates
+ (see EXTTODO for more info). Enable with -DEXTERNAL_TODO in Makefile.
+
+NEWS for 20011001 stuff:
+
+ added a variation of Henning Brauer's alternate mailhost patch.
+ For more info: mailto:<qmail-ldap-get.5350@qmail-ldap.org>
+
+ added a variation of Henning Brauer's dash-ext patch. The main
+ difference is the way it handels the extensions.
+ Example lookup scheme:
+   aaaa-bbbb-cccc@domain.tld
+   aaaa-bbbb-CATCHALL@domain.tld
+   aaaa-CATCHALL@domain.tld
+   CATCHALL@domain.tld
+ where CATCHALL is replaced with the value of LDAP_CATCH_ALL defined
+ in qmail-ldap.h. If CATCHALL is set to "default" instead of the standart
+ "catchall" it is allmost stock qmails behaviour.
+ The dash-ext stuff can be turned on with the -DDASH_EXT option in Makefile.
+
+ some rewrite of qmail-ldaplookup. See qmail-ldaplookup -h.
+
+ Makefile bug fixed, spawn.c was compiled without -DDEBUG. Not in 0802i.
+
+ Changes in qldap-ldaplib.*:
+  added qldap_open to open the ldap connection
+  added qldap_close to close the ldap connection
+  renamed ldap_lookup to qldap_lookup
+ Now it is possible to use one ldap (TCP) connection for multiple queries, so
+ the connection overhead with DASH_EXT is drastically reduced.
+
+ new debug/log handling. In qmail-lspawn the debug output is no 
+ longer added to bounce mails.
+
+ bug fix in the cleaned up NS-MTA code.
+
+ bugfix in catchall search string generation. Hopefully the last one.
+
+ bugfix in qmail-ldaplookup (ldap_value_free). Thanks to Sascha Gresk.
+
+ better handling of deliverymode in qmail-lspawn.c
+
+NEWS for 20010501 stuff:
+
+ bugfix in qmail-local.c by Mark Belnap. Problems with deliverymode reply.
+
+ disallow null passwords in auth_pop and auth_imap.
+
+ added RBLONLYHEADER logging control file and variable. With this it will
+ no longer reject a mail upon a RBL match but it will mark it with a "X-RBL:"
+ header.
+
+ major cleanup in digest_* and base64 to make the code more djb style.
+ Minor cleanup in some other files. compatibility.h is no longer needed. YES!
+
+ string fix in digest_md5.c (NS_MTA handling)
+
+ bugfix in catchall search string generation.
+
+ bugfixes in maildir++ support. Thanks to Franky Van Liedekerke.
+
+ bugfixes in qmail-reply
+
+ new attribute qmailAccountPurge for automatic purging of maildirs from
+ deleted accounts
+
+NEWS for 20010301
+
+ added 0.0.0.0 patch
+
+ some fixes for misc. stuff from Chris Noe
+  - with DEBUGLEVEL set, the default ldapGID is printed incorrectly
+  - The line above says 'without trailing slash' but the example has one :)
+  - Permanet -> Permanent
+  - Programm -> Program
+  - fix qmail-lspawn 'Out of memory' error when attempting local delivery
+    to a nonexistant user.
+
+ fix for qmail-reply.c from Jamie Blondin
+  - handle precedence flag in the right way
+
+ fix for qmail.schema mailReplyText from David E. Storey
+
+ fix for ldaptimeout to just defer message delivery instead of bouncing
+ sometimes
+
+NEWS for 20010201:
+
+ fix for ldapobjectclass bugfix
+
+ beautyfied qmail-reply.c. Now it should handel most messages in a correct
+ and nice way.
+
+ bugfix for the new ldapobjectclass and ldaptimeout stuff
+
+ bugfix in maildir++.c: algorithm has ignored all subdirs except .Trash
+
+NEWS for 20010101:
+
+ introduced ~control/objectclass to limit the ldap search to a specific
+ ldap objectclass as suggested in some recommended procedures.
+
+ bugfix in maildir++:
+    files with sizes containig 0 or 9 where claclculated wrong
+    if only one of C or S type where declared the quota of the other was ignored
+
+ changed ALIASEMPTY in qmail-ldap.h from /dev/null to |sh -c "cat > /dev/null"
+ direct writing to /dev/null resulted in a soft error. This shell call does the
+ same without an error.
+
+ introduced ~control/ldaptimeout to limit the time and ldap search might
+ take until the delivery attempt is being deferred and tried again later.
+ The default is 30 seconds.
+
+ works fine with OpenLDAP 2.x (2.0.7).
+
+ included the OpenLDAP 2.x LDAPv3 Schema definition file created by
+ David E. Storey. This version is based on the original work by David
+ but modified quite a lot by Andre. Also qmail-ldap has got it's own
+ offcially IANA assigned OID.
+
+NEWS for 20001201:
+
+ cluster loop protection enhanced, now also the users mailaddress is added:
+     Delivered-To: CLUSTERHOST host.name.as.in.control.me users@e-mail.addr
+
+ new maildir++ quota algorithm implemented. This one is simpler and should
+ therefor work much better. NOTE: The code was not tested under havy load.
+
+ major enhancements in qmail-reply.c. Fixed a bug that could crash qmail-reply
+ if a bad mail was sent. The output of qmail-reply was also beautified.
+
+ introduced MAXRCPTCOUNT to limit the maximum number of rcpt to's in one session.
+
+ introduced RBL support to check the senders IP against a number of RBL's, see
+ ~control/rbllist.
+
+ documented ~control/relaymailfrom to allow relaying based on the senders
+ mail address.
+
+ documented LOGLEVEL and DENYMAIL environment variables to qmail-smtpd.
+
+NEWS for 20001013:
+
+ possible fix for newer gcc. Problems with va_arg and unsigned chars. 
+ I don't have such a new gcc, so I don't know if this fixes the problem.
+
+ bug fix for the problem mentioned by Aleksander Dzierzanowski (mail to deleted
+ mailfiles bounce if there is a quota set).
+
+ cluster loop protection added. Now it should be impossible that mail loop
+ forever if the cluster was badly configured. It works via the Delivered-To line
+ and uses something like this: 
+     Delivered-To: CLUSTERHOST host.name.as.in.control.me
+
+ fixed multiple problems with suns cc.
+
+ fixed multiple problems and bugs in TLS support.
+
+ fixed a bug introduced with the bitmask support for debug outputs.
+
+ cleanup at different locations to respect the signedness of variables
+
+ added bitmask support for debug outputs, so DEBUGLEVEL=3 will print error and
+ warnings but DEBUGLEVEL=2 only warnings. Note: init_debug's 2nd argument has
+ changed, it's now a binary mask that is binary anded with the debuglevel. 
+ e.g.  to disable PASSWD outputs use something like -1^256 as 2nd argument.
+
+ added some defines for better testing:
+   use -DPORT_SMTP="alternate smtp port", -DPORT_LDAP="alternate ldap port" and
+       -DPORT_QMQP="alternate qmqp port" to change those ports.
+
+NEWS for 20000701 patch:
+
+ if the LDAP server is down put the message back into the queue instead of
+ bouncing
+
+ correct spelling errors in many files
+
+ forcing forwardonly and ldaponly when neither LDAP_MAILSTORE nor LDAP_HOMEDIR
+ is defined
+
+ bugfixes in hier.c and install-big.c to install qmail-ldaplookup with correct
+ 0700 permission, as told in the QLDAPINSTALL file
+
+ bug fix in checkpassword.c and qmail-ldaplookup.c with wrong index to the 
+ LDAP args array. Thanks to Ricardo Cerqueira
+
+ small bug fix in qmail-ldaplookup, fixed a wrong output.
+
+ added possible connection less LDAP support. Untested because slapd does not
+ support cladp until now. To turn it on use -DUSE_CLDAP as LDAPFLAGS
+
+NEWS for 20000601 patch:
+
+ update of the QLDAP* files
+
+ bug fix in maildir++.c and qmail-local.c, now quota_add should add the correct 
+ size of the mail. Until now only the message without DTLINE and RPLINE was 
+ sized
+
+ bugfixes in "empty file list :)"
+
+
+NEWS for 20000501 patch (and some also for 20000401):
+ 
+ Add the new control files and their meaning to qmail-showctl
+ You can use qmail-showctl to check your setup.
+
+ added new tool qmail-ldaplookup with this program you can check the ldap
+ db entries. Similar to the old checkpassword with debug support.
+ Usage: qmail-ldaplookup {-m mailaddress | -u userid [passwd]}
+ NOTE: because this tool could show critical data (like the hashed passwd)
+       it is installed with mode 000 (no rights for anybody)
+       You should only give root the permission to start it.
+
+ new mailMessageStore/homeDirectory handling.
+ Because a lot of people requested it and because I was also unhappy with it
+ I have rewritten/enhanced the mailMessageStore handling.
+ Now the homedir and aliasempty are set via both 
+ mailMessageStore (LDAP_MAILSTORE) and homeDirectory (LDAP_HOMEDIR).
+  It works like this:
+    IF LDAP_HOMEDIR exists it is used as $HOME (qmail-locals 3rd ARGV)
+      IF also LDAP_MAILSTORE exists LDAP_MAILSTORE is used as aliasempty
+        (last ARGV of qmail-local)
+      ELSE (no LDAP_MAILSTORE ) use the aliasempty specified 
+        in /var/qmail/rc or similar
+      FI
+    ELSE IF LDAP_MAILSTORE exists but no LDAP_HOMEDIR exists
+      IF LDAP_MAILSTORE is absolute use LDAP_MAILSTORE as 
+        $HOME and use standard aliasempty
+      ELSE (LDAP_MAILSTORE not absolute) use control/ldapmessagestore as
+        prefix to LDAP_MAILSTORE and use this as $HOME and use std. aliasempty
+    ELSE neither LDAP_MAILSTORE nor LDAP_HOMEDIR exists
+      use ~alias as $HOME and ALIASDEVNULL as aliasempty 
+    FI
+  
+  NOTE: the case neither LDAP_MAILSTORE nor LDAP_HOMEDIR is a bit special
+        ~alias is installed as root.qmail mode 02755 (rwxr-sr-x) so no user
+        can write to this directory. ALIASDEVNULL is defined in qmail-ldap.h
+        normally /dev/null can be used (forward-only and ldaponly will be forced
+        in the next release) or a special alert tool can be used 
+        ("|/var/qmail/bin/myalerttool")
+  NOTE2: if you use "homeDirectory" and "mailMessageStore" in an incompatible 
+        way and you want the old behavior back define LDAP_HOMEDIR in 
+        qmail-ldap.h as an nonexistent ldap db field like noHomeDirectory.
+
+ new check algorithm, I think it's faster and better.
+ Have a look at check.c. At the end of the file there is a array with all
+ ASCII chars (7bit). You can allow or deny char by adding:
+  DENY_ALL:   always deny this char
+  ALLOW_ALL:  always allow this char
+  ALLOW_USER: allow this char for username checks (chck_user)
+  DENY_USER:  deny this char for username checks (chck_user)
+  ALLOW_PATH: allow this char for path checks (chck_path)
+  DENY_PATH:  deny this char for path checks (chck_path)
+  ALLOW_PROG: allow this char for program checks (chck_prog)
+  DENY_PROG:  deny this char for program checks (chck_prog)
+  NOT_FIRST:  deny this char at the beginning of a string
+  SPACE:      alias to ALLOW_PROG
+  PARANOIA:   deny most shell special chars like '|' or '*' for program checks
+              can be turned on or of in qmail-ldap.h
+  Example:
+   /* 7  \007 ^G */ DENY_ALL, /* deny control chars */
+   /* 45 '-'     */ ALLOW_ALL|NOT_FIRST, /* allowed but not first */
+   /* 47 '/'     */ ALLOW_ALL&DENY_USER, /* allowed only for path and prog */
+   /* 58 ':'     */ ALLOW_PROG|ALLOW_PATH, /* like before */
+ 
+  As you can see ALLOWs have to be ORed together whereas DENYs have to be ANDed
+  NOT_FIRST has to be ORed and PARANOIA has to be ANDed.
+
+ getcwd and chdir no longer used in qldap-ldaplib.c init_ldap function. 
+
+ changed the connection forwarding under pop and imap. Now it should work 
+ correctly, or at least better then before ;-)
+
+ major cleanup in maildir++ support (mainly maildir++.c)
+ 
+ bugfixes in qmail-lspawn.c, qmail-reply.c and checkpassword.c
+ 
+
+NEWS for previous releases:
+
+ Added new debug facility that is usable for the auth tools and qmail-lspawn.
+ The debug-level can now be changed at runtime and everything gets logged via
+ splogger or any other logger connected to stderr of the execution chain.
+ You can set the debug level easily with the DEUBUGLEVEL environment variable.
+
+ Created a new auth tool for pop3 and imap. The old checkpassword is not 
+ needed anymore. The new programs are auth_pop and auth_imap.
+ To have the possibility to compare cleartextpasswords (password how are 
+ stored clear text in ldap) define CLEARTEXTPASSWORD. Because this setting
+ is a security disaster it is normally off. All other modes (hashed MD4, MD5,
+ SHA and the standard DES crypt) are not affected.
+ 
+ Rewritten qmail-lspawn and the auth tools. Both programs use now the same 
+ debug and ldap functions, which are now moved to new files (qldap-*).
+ The complete ldap lookup is now more flexible, so you can easier add your 
+ special stuff.
+
+ The qmailUser ldap field and the corresponding conf file are no longer used,
+ they have been replaced with the uid field.
+
+ Added maildir++ support, this means especially better quota support via the
+ maildir++ maildirsize file. For more info have a look at courier-imap
+ http://www.inter7.com/courierimap/
+
+ Added signal-handler for qmail-lspawn, now with a SIGHUP the qmail-lspawn
+ parent process reloads the his settings ( via the ~control files )
+
+ Added cluster support, use -DQLDAP_CLUSTER for enabling.
+
+ Removed PWOPTS=-DLOOK_UP_PASSWD because it was only for checkpassword
+ and with ldaplocaldelivery you get the same result on the fly.
+
+ Few minor bugfixes (qmail-qmqpd.c, qmail-qmtpd.c, receive.c)
+
+ Updated QLDAPINSTALL and added new QLDAPNEWS because QLDAPINSTALL was
+ getting to long.
+
+ Changed the make process, now with the make setup check also the qmail-ldap
+ parts are build and installed. Have fun ...
+
+ Few minor bugfixes (accountStatus, AUTO_MAILDIRMAKE)
+
+ Hack in the LDAP search filter escape function due to a bug in most LDAP
+ servers. Instead of escaping the wildchars we replace them with '_' as 
+ long as -DLDAP_ESCAPE_BUG is present. (see Makefile)
+
+ a catch all mail for one domain system is now available. The default
+ catchall account is "catchall@domain.com". You can change that to any
+ other sting in qmail-ldap.h at compile time. LDAP wildcards are not
+ allowed.
+ Due to a bug in the LDAP servers wildcards escaping does not work, so pay
+ attention.
+
+ rewritten qmail-locals qldap code, now supports better support for different 
+ dotModes. There are also some new settings.
+
+ fixed some old bugs in qmail-local
+
+ fixed already some bugs in new qmail-local code ;-)
+
+ added a log facility to qmail-lspawn.
+
+ added some experimental -extension support in qmail-lspawn.
+
+ Added a headerfile qmail-ldap.h where all parameters are set.
+ This includes some changes in qmail-local.c qmail-lspawn.c and checkpassword.c
+
+ qmail-lspawn checks no longer for "correct" mailaddresses, now the possible
+ mailaddress is escaped ('(', ')', '*') before added to the search filter.
+
+ all the stuff that was fixed in the subpatches. (XXX double check that)
+ 
+ Added some compile options in the Makefile for easier configuration (see 5.)
+
+ Added Christopher K. Davis' patch to handle oversized dns packets.
+
+ Added Chris Johnson's <cjohnson-qmail@palomine.net> tarpitting patch.
+
+ Added qmail-quotawarn and qmail-reply for better handling of quota-warnings
+ and auto reply
+
+ deliveryMode is now a comma separated list see LDAP PARAMETER FIELDS
+
+ Fixed a few things in qmail-local
+
+ Supports OpenLDAP now
+
+ WARNING: {SHA1} changed to {SHA} according to the standard
+
+ Integrated Lindsay Haisley update to Rask Lambertsen's excellent
+ antispam patch for qmail v1.01, based on Lionel Widdifield's patch.
+ Please read ANTISPAM for more information.
+
+ checkpassword now supports the password format used by Netscape
+ Mailserver pre-3.0 and Software.com's Post.Office (NS-MTA-MD5).
+ That string is hex encoded, the first 32 Octets are the MD5 hashed
+ password and the second 32 Octets are the salt to the MD5 function.
+
+ Added automatic homedir and maildir maker to qmail-local.
+ This can be enabled with ~control/dirmaker
+
+ qmail-smtpd does logging now. This can be set by an environment variable
+ in tcpserver: LOGLEVEL="X". "0" or not present = no logging, "1" = fatal
+ errors, "2" = connection setup and warnings, "3" = verbose.
+
+ Added fix for qmail-pop3d stat command bug found by Aaron Nabil
+ <nabil@spiritone.com>.
+
+ checkpassword compiled with QLDAPDEBUG now does complete LDAP debugging.
+  Usage: ./checkpassword POPLogin POPPassword
+
+ digest computes MD4, MD5, RMD160 and SHA passwords (compatible to Netscape)
+  Usage: ./digest POPPassword
+
+ solved a problem on big endian machines that caused wrong SHA, MD5, MD4, 
+ RMD160 passwords. (Added an endian testprogram to solve those probs)
+ 
+ added a working version of the "MAKE_NETSCAPE_WORK" patch under qmail-pop3d.
+ The download bar should now work correctly.
+ 
+ Fixed the bugs in qmail-lspawn. Changed stralloc_catb to stralloc_cat. 
+ Thanks to Franky Van Liedekerke <franky.van.liedekerke@telenet.be>
+ 
+

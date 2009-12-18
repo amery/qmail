@@ -1,16 +1,19 @@
 #include "byte.h"
 
 void byte_copyr(to,n,from)
-register char *to;
+void *to;
 register unsigned int n;
-register char *from;
+const void *from;
 {
-  to += n;
-  from += n;
+  register char *t = (char *)to;
+  register const char *f = (const char *)from;
+
+  t += n;
+  f += n;
   for (;;) {
-    if (!n) return; *--to = *--from; --n;
-    if (!n) return; *--to = *--from; --n;
-    if (!n) return; *--to = *--from; --n;
-    if (!n) return; *--to = *--from; --n;
+    if (!n) return; *--t = *--f; --n;
+    if (!n) return; *--t = *--f; --n;
+    if (!n) return; *--t = *--f; --n;
+    if (!n) return; *--t = *--f; --n;
   }
 }

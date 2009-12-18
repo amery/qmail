@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include "substdio.h"
 #include "readwrite.h"
 #include "subfd.h"
@@ -16,6 +17,7 @@
 #include "auto_break.h"
 #include "auto_qmail.h"
 #include "auto_usera.h"
+#include "byte.h"
 
 void die_chdir()
 {
@@ -67,7 +69,7 @@ void die_user(s,len) char *s; unsigned int len;
   _exit(111);
 }
 
-char *dashcolon = "-:";
+const char *dashcolon = "-:";
 int flagalias = 0;
 int flagnoupper = 1;
 int homestrategy = 2;
@@ -93,8 +95,8 @@ stralloc line = {0};
 void doaccount()
 {
   struct stat st;
-  int i;
-  char *mailnames;
+  unsigned int i;
+  const char *mailnames;
   char *x;
   unsigned int xlen;
 
@@ -194,21 +196,21 @@ stralloc sub = {0};
 
 void dosubuser()
 {
-  int i;
+  unsigned int i;
   char *x;
   unsigned int xlen;
-  char *uugh;
+  const char *uughs;
 
   x = line.s; xlen = line.len; i = byte_chr(x,xlen,':'); if (i == xlen) return;
   if (!stralloc_copyb(&sub,x,i)) die_nomem();
   ++i; x += i; xlen -= i; i = byte_chr(x,xlen,':'); if (i == xlen) return;
-  uugh = constmap(&mapuser,x,i);
-  if (!uugh) die_user(x,i);
+  uughs = constmap(&mapuser,x,i);
+  if (!uughs) die_user(x,i);
   ++i; x += i; xlen -= i; i = byte_chr(x,xlen,':'); if (i == xlen) return;
 
   if (substdio_puts(subfdout,"=") == -1) die_write();
   if (substdio_put(subfdout,sub.s,sub.len) == -1) die_write();
-  if (substdio_puts(subfdout,uugh) == -1) die_write();
+  if (substdio_puts(subfdout,uughs) == -1) die_write();
   if (substdio_puts(subfdout,dashcolon) == -1) die_write();
   if (substdio_put(subfdout,x,i) == -1) die_write();
   if (substdio_puts(subfdout,":\n") == -1) die_write();
@@ -217,7 +219,7 @@ void dosubuser()
     if (substdio_puts(subfdout,"+") == -1) die_write();
     if (substdio_put(subfdout,sub.s,sub.len) == -1) die_write();
     if (substdio_put(subfdout,auto_break,1) == -1) die_write();
-    if (substdio_puts(subfdout,uugh) == -1) die_write();
+    if (substdio_puts(subfdout,uughs) == -1) die_write();
     if (substdio_puts(subfdout,dashcolon) == -1) die_write();
     if (substdio_put(subfdout,x,i) == -1) die_write();
     if (substdio_puts(subfdout,"-:\n") == -1) die_write();
@@ -228,7 +230,7 @@ int fd;
 substdio ss;
 char ssbuf[SUBSTDIO_INSIZE];
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
@@ -280,7 +282,7 @@ char **argv;
     if (errno != error_noent) die_control();
   }
   else {
-    substdio_fdbuf(&ss,read,fd,ssbuf,sizeof(ssbuf));
+    substdio_fdbuf(&ss,subread,fd,ssbuf,sizeof(ssbuf));
 
     if (!constmap_init(&mapuser,allusers.s,allusers.len,1)) die_nomem();
 
@@ -298,7 +300,7 @@ char **argv;
     if (errno != error_noent) die_control();
   }
   else {
-    substdio_fdbuf(&ss,read,fd,ssbuf,sizeof(ssbuf));
+    substdio_fdbuf(&ss,subread,fd,ssbuf,sizeof(ssbuf));
     for (;;) {
       if (getln(&ss,&line,&match,'\n') == -1) die_read();
       if (substdio_put(subfdout,line.s,line.len) == -1) die_write();
@@ -308,5 +310,5 @@ char **argv;
 
   if (substdio_puts(subfdout,".\n") == -1) die_write();
   if (substdio_flush(subfdout) == -1) die_write();
-  _exit(0);
+  return 0;
 }

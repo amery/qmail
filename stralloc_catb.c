@@ -3,7 +3,7 @@
 
 int stralloc_catb(sa,s,n)
 stralloc *sa;
-char *s;
+const char *s;
 unsigned int n;
 {
   if (!sa->s) return stralloc_copyb(sa,s,n);

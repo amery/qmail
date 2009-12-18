@@ -9,12 +9,12 @@ struct constmap {
   constmap_hash *hash;
   int *first;
   int *next;
-  char **input;
-  int *inputlen;
+  const char **input;
+  unsigned int *inputlen;
 } ;
 
-extern int constmap_init();
-extern void constmap_free();
-extern char *constmap();
+extern int constmap_init(struct constmap *, const char *, unsigned int, int);
+extern void constmap_free(struct constmap *);
+extern const char *constmap(struct constmap *, const char *, unsigned int);
 
 #endif

@@ -4,7 +4,8 @@
 #include "strerr.h"
 
 void strerr_warn(x1,x2,x3,x4,x5,x6,se)
-char *x1; char *x2; char *x3; char *x4; char *x5; char *x6;
+const char *x1; const char *x2; const char *x3;
+const char *x4; const char *x5; const char *x6;
 struct strerr *se;
 {
   strerr_sysinit();
@@ -29,7 +30,8 @@ struct strerr *se;
 
 void strerr_die(e,x1,x2,x3,x4,x5,x6,se)
 int e;
-char *x1; char *x2; char *x3; char *x4; char *x5; char *x6;
+const char *x1; const char *x2; const char *x3;
+const char *x4; const char *x5; const char *x6;
 struct strerr *se;
 {
   strerr_warn(x1,x2,x3,x4,x5,x6,se);

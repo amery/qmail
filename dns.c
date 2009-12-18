@@ -7,8 +7,8 @@
 #include <errno.h>
 extern int res_query();
 extern int res_search();
-extern int errno;
 extern int h_errno;
+#include "errno.h"
 #include "ip.h"
 #include "ipalloc.h"
 #include "fmt.h"
@@ -17,14 +17,20 @@ extern int h_errno;
 #include "stralloc.h"
 #include "dns.h"
 #include "case.h"
+#ifdef IGNOREVERISIGN
+#include "byte.h"
+#define FUCKVERISIGN 
+#endif
 
 static unsigned short getshort(c) unsigned char *c;
 { unsigned short u; u = c[0]; return (u << 8) + c[1]; }
 
-static union { HEADER hdr; unsigned char buf[PACKETSZ]; } response;
+static struct { unsigned char *buf; } response;
+static int responsebuflen = 0;
 static int responselen;
 static unsigned char *responseend;
 static unsigned char *responsepos;
+static u_long saveresoptions;
 
 static int numanswers;
 static char name[MAXDNAME];
@@ -45,18 +51,35 @@ int type;
  errno = 0;
  if (!stralloc_copy(&glue,domain)) return DNS_MEM;
  if (!stralloc_0(&glue)) return DNS_MEM;
- responselen = lookup(glue.s,C_IN,type,response.buf,sizeof(response));
+ if (!responsebuflen) {
+  if ((response.buf = (unsigned char *)alloc(PACKETSZ+1)))
+   responsebuflen = PACKETSZ+1;
+  else return DNS_MEM;
+ }
+ 
+ responselen = lookup(glue.s,C_IN,type,response.buf,responsebuflen);
+ if ((responselen >= responsebuflen) ||
+     (responselen > 0 && (((HEADER *)response.buf)->tc)))
+  {
+   if (responsebuflen < 65536) {
+    if (alloc_re((char **)&response.buf, responsebuflen, 65536))
+     responsebuflen = 65536;
+    else return DNS_MEM;
+    saveresoptions = _res.options;
+    _res.options |= RES_USEVC;
+    responselen = lookup(glue.s,C_IN,type,response.buf,responsebuflen);
+    _res.options = saveresoptions;
+   }
+  }
  if (responselen <= 0)
   {
    if (errno == ECONNREFUSED) return DNS_SOFT;
    if (h_errno == TRY_AGAIN) return DNS_SOFT;
    return DNS_HARD;
   }
- if (responselen >= sizeof(response))
-   responselen = sizeof(response);
  responseend = response.buf + responselen;
  responsepos = response.buf + sizeof(HEADER);
- n = ntohs(response.hdr.qdcount);
+ n = ntohs(((HEADER *)response.buf)->qdcount);
  while (n-- > 0)
   {
    i = dn_expand(response.buf,responseend,responsepos,name,MAXDNAME);
@@ -66,7 +89,7 @@ int type;
    if (i < QFIXEDSZ) return DNS_SOFT;
    responsepos += QFIXEDSZ;
   }
- numanswers = ntohs(response.hdr.ancount);
+ numanswers = ntohs(((HEADER *)response.buf)->ancount);
  return 0;
 }
 
@@ -219,32 +242,32 @@ stralloc *sa;
 
 #define FMT_IAA 40
 
-static int iaafmt(s,ip)
+static int iaafmt(s,tip)
 char *s;
-struct ip_address *ip;
+struct ip_address *tip;
 {
  unsigned int i;
  unsigned int len;
  len = 0;
- i = fmt_ulong(s,(unsigned long) ip->d[3]); len += i; if (s) s += i;
+ i = fmt_ulong(s,(unsigned long) tip->d[3]); len += i; if (s) s += i;
  i = fmt_str(s,"."); len += i; if (s) s += i;
- i = fmt_ulong(s,(unsigned long) ip->d[2]); len += i; if (s) s += i;
+ i = fmt_ulong(s,(unsigned long) tip->d[2]); len += i; if (s) s += i;
  i = fmt_str(s,"."); len += i; if (s) s += i;
- i = fmt_ulong(s,(unsigned long) ip->d[1]); len += i; if (s) s += i;
+ i = fmt_ulong(s,(unsigned long) tip->d[1]); len += i; if (s) s += i;
  i = fmt_str(s,"."); len += i; if (s) s += i;
- i = fmt_ulong(s,(unsigned long) ip->d[0]); len += i; if (s) s += i;
+ i = fmt_ulong(s,(unsigned long) tip->d[0]); len += i; if (s) s += i;
  i = fmt_str(s,".in-addr.arpa."); len += i; if (s) s += i;
  return len;
 }
 
-int dns_ptr(sa,ip)
+int dns_ptr(sa,tip)
 stralloc *sa;
-struct ip_address *ip;
+struct ip_address *tip;
 {
  int r;
 
- if (!stralloc_ready(sa,iaafmt((char *) 0,ip))) return DNS_MEM;
- sa->len = iaafmt(sa->s,ip);
+ if (!stralloc_ready(sa,iaafmt((char *) 0,tip))) return DNS_MEM;
+ sa->len = iaafmt(sa->s,tip);
  switch(resolve(sa,T_PTR))
   {
    case DNS_MEM: return DNS_MEM;
@@ -263,13 +286,22 @@ struct ip_address *ip;
  return DNS_HARD;
 }
 
-static int dns_ipplus(ia,sa,pref)
+#ifdef FUCKVERISIGN
+static stralloc tld = {0};
+static ipalloc  tldia = {0};
+#endif
+
+static int dns_ipplus(ia,sa,spref)
 ipalloc *ia;
 stralloc *sa;
-int pref;
+int spref;
 {
  int r;
  struct ip_mx ix;
+#ifdef FUCKVERISIGN
+ unsigned int j;
+ struct ip_mx tldix;
+#endif
 
  if (!stralloc_copy(&glue,sa)) return DNS_MEM;
  if (!stralloc_0(&glue)) return DNS_MEM;
@@ -280,7 +312,34 @@ int pref;
      if (!ipalloc_append(ia,&ix)) return DNS_MEM;
      return 0;
     }
+
  }
+
+#ifdef FUCKVERISIGN
+   j = byte_rchr(sa->s,sa->len,'.');
+   if (j+2 < sa->len) {
+     if(!stralloc_copys(&tld, "*")) return DNS_MEM;
+     if(!stralloc_catb(&tld, sa->s+j, sa->len-j)) return DNS_MEM;
+     switch(resolve(&tld,T_A))
+     {
+       case DNS_HARD: tldia.len = 0; break;
+       case DNS_MEM: return DNS_MEM;
+       case DNS_SOFT: return DNS_SOFT;
+       default:
+         if (!ipalloc_readyplus(&tldia,0)) return DNS_MEM;
+	 tldia.len = 0;
+	 tldix.pref = 0;
+         while ((r = findip(T_A)) != 2)
+         {
+           if (r == DNS_SOFT) return DNS_SOFT;
+           if (r == 1) {
+	     tldix.ip = ip;
+	     if (!ipalloc_append(&tldia,&tldix)) return DNS_MEM;
+	   }
+         }
+     }
+   }
+#endif
 
  switch(resolve(sa,T_A))
   {
@@ -291,10 +350,17 @@ int pref;
  while ((r = findip(T_A)) != 2)
   {
    ix.ip = ip;
-   ix.pref = pref;
+   ix.pref = spref;
    if (r == DNS_SOFT) return DNS_SOFT;
-   if (r == 1)
+   if (r == 1) {
+#ifdef FUCKVERISIGN
+     for (j = 0; j < tldia.len; j++)
+       if (byte_diff(&tldia.ix[j].ip, sizeof(struct ip_address), &ip) == 0)
+	 break;
+     if (j < tldia.len) continue;
+#endif
      if (!ipalloc_append(ia,&ix)) return DNS_MEM;
+   }
   }
  return 0;
 }

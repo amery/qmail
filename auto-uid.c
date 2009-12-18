@@ -8,7 +8,7 @@
 #include "fmt.h"
 
 char buf1[256];
-substdio ss1 = SUBSTDIO_FDBUF(write,1,buf1,sizeof(buf1));
+substdio ss1 = SUBSTDIO_FDBUF(subwrite,1,buf1,sizeof(buf1));
 
 void outs(s) /* was named puts, but Solaris pwd.h includes stdio.h. dorks. */
 char *s;
@@ -16,7 +16,7 @@ char *s;
   if (substdio_puts(&ss1,s) == -1) _exit(111);
 }
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
@@ -41,11 +41,11 @@ char **argv;
 
   strnum[fmt_ulong(strnum,(unsigned long) pw->pw_uid)] = 0;
 
-  outs("int ");
+  outs("unsigned int ");
   outs(name);
   outs(" = ");
   outs(strnum);
   outs(";\n");
   if (substdio_flush(&ss1) == -1) _exit(111);
-  _exit(0);
+  return 0;
 }

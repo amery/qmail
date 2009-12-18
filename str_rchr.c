@@ -1,12 +1,12 @@
 #include "str.h"
 
 unsigned int str_rchr(s,c)
-register char *s;
+register const char *s;
 int c;
 {
   register char ch;
-  register char *t;
-  register char *u;
+  register const char *t;
+  register const char *u;
 
   ch = c;
   t = s;

@@ -28,10 +28,10 @@ int optdone = SUBGETOPTDONE;
 int sgopt(argc,argv,opts)
 int argc;
 char **argv;
-char *opts;
+const char *opts;
 {
   int c;
-  char *s;
+  const char *s;
 
   optarg = 0;
   if (!argv || (optind >= argc) || !argv[optind]) return optdone;

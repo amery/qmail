@@ -21,26 +21,42 @@ struct ip_address *ip;
 }
 
 unsigned int ip_scan(s,ip)
-char *s;
+const char *s;
 struct ip_address *ip;
 {
   unsigned int i;
   unsigned int len;
   unsigned long u;
- 
+
+  /*
+   * Don't play games. everything over 255 is invalid and we need a full
+   * IP address. No magic expands like 127.1 or similar bullshit.
+   */
   len = 0;
-  i = scan_ulong(s,&u); if (!i) return 0; ip->d[0] = u; s += i; len += i;
+  i = scan_ulong(s,&u);
+  if (!i || u > 255) return 0;
+  ip->d[0] = u; s += i; len += i;
+
   if (*s != '.') return 0; ++s; ++len;
-  i = scan_ulong(s,&u); if (!i) return 0; ip->d[1] = u; s += i; len += i;
+  i = scan_ulong(s,&u);
+  if (!i || u > 255) return 0;
+  ip->d[1] = u; s += i; len += i;
+
   if (*s != '.') return 0; ++s; ++len;
-  i = scan_ulong(s,&u); if (!i) return 0; ip->d[2] = u; s += i; len += i;
+  i = scan_ulong(s,&u);
+  if (!i || u > 255) return 0;
+  ip->d[2] = u; s += i; len += i;
+
   if (*s != '.') return 0; ++s; ++len;
-  i = scan_ulong(s,&u); if (!i) return 0; ip->d[3] = u; s += i; len += i;
+  i = scan_ulong(s,&u);
+  if (!i || u > 255) return 0;
+  ip->d[3] = u; s += i; len += i;
+
   return len;
 }
 
 unsigned int ip_scanbracket(s,ip)
-char *s;
+const char *s;
 struct ip_address *ip;
 {
   unsigned int len;

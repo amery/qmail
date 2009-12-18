@@ -60,7 +60,7 @@ stralloc quoted = {0};
 
 void finishheader()
 {
- char *qqx;
+ const char *qqx;
 
  if (!flagreceipt) die_noreceipt();
  if (str_equal(returnpath,"")) die_noreceipt();
@@ -92,9 +92,10 @@ following address: ");
  qmail_to(&qqt,returnpath);
  qqx = qmail_close(&qqt);
 
- if (*qqx)
+ if (*qqx) {
    if (*qqx == 'D') die_qqperm();
    else die_qqtemp();
+ }
 }
 
 stralloc hfbuf = {0};
@@ -119,7 +120,7 @@ stralloc *h;
 
 void dobody(h) stralloc *h; { ; }
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
@@ -128,4 +129,6 @@ char **argv;
  if (!(returnpath = env_get("SENDER"))) die_usage();
  if (headerbody(subfdin,doheaderfield,finishheader,dobody) == -1) die_read();
  die_noreceipt();
+ /* NOTREACHED */
+ return 0;
 }

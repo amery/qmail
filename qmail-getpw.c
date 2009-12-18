@@ -18,7 +18,7 @@
 
 char *local;
 struct passwd *pw;
-char *dash;
+const char *dash;
 char *extension;
 
 int userext()
@@ -28,7 +28,7 @@ int userext()
 
   extension = local + str_len(local);
   for (;;) {
-    if (extension - local < sizeof(username))
+    if ((unsigned long)(extension - local) < sizeof(username))
       if (!*extension || (*extension == *auto_break)) {
 	byte_copy(username,extension - local,local);
 	username[extension - local] = 0;
@@ -37,7 +37,7 @@ int userext()
 	pw = getpwnam(username);
 	if (errno == error_txtbsy) _exit(QLX_SYS);
 	if (pw)
-	  if (pw->pw_uid)
+	  if (pw->pw_uid) {
 	    if (stat(pw->pw_dir,&st) == 0) {
 	      if (st.st_uid == pw->pw_uid) {
 		dash = "";
@@ -47,6 +47,7 @@ int userext()
 	    }
 	    else
 	      if (error_temp(errno)) _exit(QLX_NFS);
+	  }
       }
     if (extension == local) return 0;
     --extension;
@@ -55,7 +56,7 @@ int userext()
 
 char num[FMT_ULONG];
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
@@ -84,5 +85,5 @@ char **argv;
   substdio_put(subfdoutsmall,"",1);
   substdio_flush(subfdoutsmall);
 
-  _exit(0);
+  return 0;
 }

@@ -13,7 +13,7 @@ void die_nomem() { strerr_die2x(111,FATAL,"out of memory"); }
 
 struct qmail qqt;
 
-int mywrite(fd,buf,len) int fd; char *buf; int len;
+int mywrite(int fd, void *buf, int len)
 {
   qmail_put(&qqt,buf,len);
   return len;
@@ -21,18 +21,18 @@ int mywrite(fd,buf,len) int fd; char *buf; int len;
 
 char inbuf[SUBSTDIO_INSIZE];
 char outbuf[1];
-substdio ssin = SUBSTDIO_FDBUF(read,0,inbuf,sizeof inbuf);
+substdio ssin = SUBSTDIO_FDBUF(subread,0,inbuf,sizeof inbuf);
 substdio ssout = SUBSTDIO_FDBUF(mywrite,-1,outbuf,sizeof outbuf);
 
 char num[FMT_ULONG];
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
   char *sender;
   char *dtline;
-  char *qqx;
+  const char *qqx;
  
   sig_pipeignore();
  
@@ -57,4 +57,5 @@ char **argv;
   qqx = qmail_close(&qqt);
   if (*qqx) strerr_die2x(*qqx == 'D' ? 100 : 111,FATAL,qqx + 1);
   strerr_die2x(0,"forward: qp ",num);
+  return 0;
 }

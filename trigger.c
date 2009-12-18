@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "select.h"
 #include "open.h"
 #include "trigger.h"
@@ -8,7 +9,7 @@ static int fd = -1;
 static int fdw = -1;
 #endif
 
-void trigger_set()
+void trigger_set(void)
 {
  if (fd != -1)
    close(fd);

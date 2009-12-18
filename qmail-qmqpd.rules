@@ -1,0 +1,10 @@
+#
+# QMQP (qmail mail queueing protocol) server rules.
+# QMQP is mainly used in clusters to forward mails. The protocol accepts all
+# mails by default and so it is necessary to disable this service by default.
+# Only allow it for cluster hosts.
+# Currently there are no useful env vars for qmail-qmqpd.
+#
+#192.168.0.2:allow
+:deny
+

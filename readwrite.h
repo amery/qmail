@@ -1,7 +1,7 @@
 #ifndef READWRITE_H
 #define READWRITE_H
 
-extern int read();
-extern int write();
+int subread(int, void *, int);
+int subwrite(int, void *, int);
 
 #endif

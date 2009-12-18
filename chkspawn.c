@@ -8,7 +8,7 @@
 char num[FMT_ULONG];
 fd_set fds;
 
-void main()
+int main(int argc, char **argv)
 {
   unsigned long hiddenlimit;
   unsigned long maxnumd;
@@ -22,8 +22,8 @@ void main()
     _exit(1);
   }
 
-  if (auto_spawn > 255) {
-    substdio_puts(subfderr,"Oops. You have set conf-spawn higher than 255.\n");
+  if (auto_spawn > 65000) {
+    substdio_puts(subfderr,"Oops. You have set conf-spawn higher than 65000.\n");
     substdio_flush(subfderr);
     _exit(1);
   }
@@ -44,5 +44,5 @@ limit in conf-spawn be at most ");
     substdio_flush(subfderr);
     _exit(1);
   }
-  _exit(0);
+  return 0;
 }

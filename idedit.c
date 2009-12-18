@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <grp.h>
+#include <unistd.h>
 #include "readwrite.h"
 #include "exit.h"
 #include "scan.h"
@@ -9,6 +10,7 @@
 #include "open.h"
 #include "seek.h"
 #include "fork.h"
+#include "wait.h"
 
 #define FATAL "idedit: fatal: "
 #define WARNING "idedit: warning: "
@@ -67,7 +69,7 @@ char *pos3;
   pw = getpwnam(account);
 
   if (!pw && group) {
-    args[0] = "add-account";
+    args[0] = (char *)"add-account";
     args[1] = account;
     args[2] = group;
     args[3] = home;
@@ -101,7 +103,7 @@ char *pos3;
   gr = getgrnam(group);
 
   if (!gr) {
-    args[0] = "add-group";
+    args[0] = (char *)"add-group";
     args[1] = group;
     args[2] = 0;
     run();
@@ -120,7 +122,7 @@ char *pos3;
     strerr_die3x(111,FATAL,"excessively large gid for ",group);
 }
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
@@ -143,5 +145,5 @@ char **argv;
   u("qmailr","qmail","/var/qmail",argv[26],argv[27],argv[28],argv[29]);
   u("qmails","qmail","/var/qmail",argv[30],argv[31],argv[32],argv[33]);
 
-  _exit(0);
+  return 0;
 }

@@ -6,9 +6,9 @@
 
 char temp[IPFMT];
 
-void main()
+int main(int argc, char **argv)
 {
- int j;
+ unsigned int j;
  switch(ipme_init())
   {
    case 0: substdio_putsflush(subfderr,"out of memory\n"); _exit(111);
@@ -20,5 +20,5 @@ void main()
    substdio_puts(subfdout,"\n");
   }
  substdio_flush(subfdout);
- _exit(0);
+ return 0;
 }

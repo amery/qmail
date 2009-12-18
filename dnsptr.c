@@ -11,7 +11,7 @@
 stralloc sa = {0};
 struct ip_address ip;
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
@@ -23,5 +23,5 @@ char **argv;
  dnsdoe(dns_ptr(&sa,&ip));
  substdio_putflush(subfdout,sa.s,sa.len);
  substdio_putsflush(subfdout,"\n");
- _exit(0);
+ return 0;
 }

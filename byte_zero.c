@@ -1,13 +1,14 @@
 #include "byte.h"
 
 void byte_zero(s,n)
-char *s;
+void *s;
 register unsigned int n;
 {
+  char *S = (char *)s;
   for (;;) {
-    if (!n) break; *s++ = 0; --n;
-    if (!n) break; *s++ = 0; --n;
-    if (!n) break; *s++ = 0; --n;
-    if (!n) break; *s++ = 0; --n;
+    if (!n) break; *S++ = 0; --n;
+    if (!n) break; *S++ = 0; --n;
+    if (!n) break; *S++ = 0; --n;
+    if (!n) break; *S++ = 0; --n;
   }
 }

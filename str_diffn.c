@@ -1,8 +1,8 @@
 #include "str.h"
 
 int str_diffn(s,t,len)
-register char *s;
-register char *t;
+register const char *s;
+register const char *t;
 unsigned int len;
 {
   register char x;

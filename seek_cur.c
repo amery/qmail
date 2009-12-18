@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <unistd.h>
 #include "seek.h"
 
 #define CUR 1 /* sigh */

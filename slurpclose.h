@@ -1,6 +1,8 @@
 #ifndef SLURPCLOSE_H
 #define SLURPCLOSE_H
 
-extern int slurpclose();
+#include "stralloc.h"
+
+extern int slurpclose(int, stralloc *, unsigned int);
 
 #endif

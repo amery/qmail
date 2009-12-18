@@ -1,0 +1,62 @@
+diff -BbuN qmail-ldap/Makefile qmail-test/Makefile
+--- qmail-ldap/Makefile	Thu Jul 20 22:07:09 2000
++++ qmail-test/Makefile	Thu Jul 20 22:55:52 2000
+@@ -1402,12 +1402,13 @@
+ sig.a strerr.a getln.a wait.a case.a cdb.a fd.a open.a stralloc.a \
+ alloc.a substdio.a error.a str.a fs.a auto_qmail.o auto_uids.o \
+ auto_spawn.o auto_usera.o env.a qldap-ldaplib.o qldap-debug.o \
+-qldap-errno.o
++qldap-errno.o qldap-profile.o
+ 	./load qmail-lspawn spawn.o prot.o slurpclose.o coe.o control.o \
+-	check.o qldap-ldaplib.o qldap-debug.o sig.a strerr.a getln.a \
++	check.o qldap-ldaplib.o qldap-profile.o \
++	qldap-debug.o sig.a strerr.a getln.a \
+ 	wait.a case.a cdb.a fd.a open.a env.a stralloc.a alloc.a \
+ 	substdio.a str.a qldap-errno.o error.a fs.a auto_qmail.o \
+-	auto_uids.o auto_usera.o auto_spawn.o $(LDAPLIBS)
++	auto_uids.o auto_usera.o auto_spawn.o $(LDAPLIBS) $(LIBTAI)
+ 
+ qmail-lspawn.0: \
+ qmail-lspawn.8
+@@ -1419,7 +1420,8 @@
+ slurpclose.h auto_qmail.h auto_uids.h qlx.h qmail-ldap.h check.h \
+ qldap-ldaplib.h qldap-errno.h qldap-debug.h env.h auto_usera.h \
+ auto_uids.h fmt.h sig.h  
+-	./compile $(LDAPFLAGS) $(HDIRMAKE) $(LDAPINCLUDES) qmail-lspawn.c
++	./compile $(LDAPFLAGS) $(HDIRMAKE) $(LDAPINCLUDES) $(INCTAI) 
++	qmail-lspawn.c
+ 
+ qmail-newmrh: \
+ load qmail-newmrh.o cdbmss.o getln.a open.a cdbmake.a seek.a case.a \
+diff -BbuN qmail-ldap/qmail-lspawn.c qmail-test/qmail-lspawn.c
+--- qmail-ldap/qmail-lspawn.c	Mon Jul  3 13:22:01 2000
++++ qmail-test/qmail-lspawn.c	Thu Jul 20 22:55:53 2000
+@@ -31,6 +31,7 @@
+ #include "str.h"
+ #include <pwd.h>
+ #include <sys/types.h>
++#include "qldap-profile.h"
+ 
+ char *aliasempty;
+ 
+@@ -369,7 +370,9 @@
+    extra[6].what = 0;
+ 
+    /* do the search for the email address */
++   start_timing(0, "first ldap_lookup");
+    ret = ldap_lookup(&search, attrs, &info, extra);
++   stop_timing(0);
+    if (!stralloc_copys(&filter, "")) _exit(QLX_NOMEM); 
+    /* XXX doesn't free mem */
+    if ( ret != 0 && qldap_errno == LDAP_NOSUCH ) {
+@@ -391,8 +394,10 @@
+       
+       debug(16, "retry with filter '%s'\n", filter.s);
+       /* do the search for the email address */
++      start_timing(0, "first ldap_lookup");
+       ret = ldap_lookup(&search, attrs, &info, extra);
+       /* count the results, we must have exactly one */
++      stop_timing(0);
+    }
+    alloc_free(filter.s); filter.s = 0;
+    if ( ret != 0 ) {

@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "sgetopt.h"
 #include "substdio.h"
 #include "subfd.h"
@@ -19,7 +20,7 @@ void die_usage()
   _exit(100);
 }
 
-char *smtpdarg[] = { "bin/qmail-smtpd", 0 };
+const char *smtpdarg[] = { "bin/qmail-smtpd", 0 };
 void smtpd()
 {
   if (!env_get("PROTO")) {
@@ -32,29 +33,61 @@ void smtpd()
     if (!env_put("TCPREMOTEHOST=localhost")) nomem();
     if (!env_put("TCPREMOTEINFO=sendmail-bs")) nomem();
   }
-  execv(*smtpdarg,smtpdarg);
+  execv(*smtpdarg,(char **)smtpdarg);
   substdio_putsflush(subfderr,"sendmail: fatal: unable to run qmail-smtpd\n");
   _exit(111);
 }
 
-char *qreadarg[] = { "bin/qmail-qread", 0 };
+const char *qreadarg[] = { "bin/qmail-qread", 0 };
 void mailq()
 {
-  execv(*qreadarg,qreadarg);
+  execv(*qreadarg,(char **)qreadarg);
   substdio_putsflush(subfderr,"sendmail: fatal: unable to run qmail-qread\n");
   _exit(111);
+}
+
+void do_sender(s)
+const char *s;
+{
+  char *x;
+  unsigned int n;
+  unsigned int a;
+  unsigned int i;
+  
+  env_unset("QMAILNAME");
+  env_unset("MAILNAME");
+  env_unset("NAME");
+  env_unset("QMAILHOST");
+  env_unset("MAILHOST");
+
+  n = str_len(s);
+  a = str_rchr(s, '@');
+  if (a == n)
+  {
+    env_put2("QMAILUSER", s);
+    return;
+  }
+  env_put2("QMAILHOST", s + a + 1);
+
+  x = alloc((a + 1) * sizeof(char));
+  if (!x) nomem();
+  for (i = 0; i < a; i++)
+    x[i] = s[i];
+  x[i] = 0;
+  env_put2("QMAILUSER", x);
+  alloc_free(x);
 }
 
 int flagh;
 char *sender;
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
   int opt;
-  char **qiargv;
-  char **arg;
+  const char **qiargv;
+  const char **arg;
   int i;
  
   if (chdir(auto_qmail) == -1) {
@@ -109,7 +142,7 @@ char **argv;
     _exit(100);
   }
 
-  qiargv = (char **) alloc((argc + 10) * sizeof(char *));
+  qiargv = (const char **) alloc((argc + 10) * sizeof(char *));
   if (!qiargv) nomem();
  
   arg = qiargv;
@@ -118,12 +151,13 @@ char **argv;
   if (sender) {
     *arg++ = "-f";
     *arg++ = sender;
+    do_sender(sender);
   }
   *arg++ = "--";
   for (i = 0;i < argc;++i) *arg++ = argv[i];
   *arg = 0;
  
-  execv(*qiargv,qiargv);
+  execv(*qiargv,(char **)qiargv);
   substdio_putsflush(subfderr,"sendmail: fatal: unable to run qmail-inject\n");
-  _exit(111);
+  return 111;
 }

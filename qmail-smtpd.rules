@@ -1,0 +1,29 @@
+#
+# SMTP server rules.
+# Default rule is to accept mails but not to relay. Do not even think of setting
+# RELAYCLIENT on the default rule.
+# Other useful stuff:
+#  AUTHPREPEND: String that is prepended to the login in the received line
+#  AUTHREQUIRED: Allow sending of messages only from authenticated senders.
+#  BLOCKRELAYPROBE: reject recipients with and "!", "%" or double-"@"
+#  LDAPSOFTOK: Ignore ldap soft errors in RCPTCHECK and SENDERCHECK
+#  LOGLEVEL: Level of log verbosity
+#  MAXRCPTCOUNT: maximum number of RCPT TOs you accept
+#  NOBOUNCE: Rejects null sender bounces, use only in extreme cases
+#  NOPBS: Disable pop-befor-smtp feature (pbscheck).
+#  QMAILQUEUE: alternate mail queueing program
+#  RBL: If set turns on rbl checking.
+#  RBLONLYHEADER: only tag messages filtered by rbl checking.
+#  RCPTCHECK: Check if the recipient of a message really exists.
+#  REJECTEXEC: Reject DOS/Windows executables in mail attachements.
+#  RETURNMXCHECK: Rejects senders if they don't have a valid return MX.
+#  SANITYCHECK: Rejects senders without an @, no . or too long/short TLD
+#  SENDERCHECK: Check if the sender of a message really exists.
+#  SMTPAUTH: Enables SMTP-AUTH for remote clients.
+#  550GREETING: Rejects a connection right away with an 550 error
+#  SMTP550DISCONNECT: Disconnect the SMTP session if a 5xx error happens
+#  TARPITCOUNT: number of RCPT TOs you accept before you start tarpitting.
+#  TARPITDELAY: number of seconds of delay to introduce while tarpitting
+#
+#192.168.0.:allow,RELAYCLIENT=""
+:allow

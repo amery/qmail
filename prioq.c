@@ -36,9 +36,9 @@ struct prioq_elt *pe;
 void prioq_delmin(pq)
 prioq *pq;
 {
- int i;
- int j;
- int n;
+ unsigned int i;
+ unsigned int j;
+ unsigned int n;
  if (!pq->p) return;
  n = pq->len;
  if (!n) return;

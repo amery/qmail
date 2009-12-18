@@ -4,7 +4,7 @@
 
 int stralloc_cats(sa,s)
 stralloc *sa;
-char *s;
+const char *s;
 {
   return stralloc_catb(sa,s,str_len(s));
 }

@@ -1,9 +1,9 @@
 #include "str.h"
 
 unsigned int str_len(s)
-register char *s;
+register const char *s;
 {
-  register char *t;
+  register const char *t;
 
   t = s;
   for (;;) {

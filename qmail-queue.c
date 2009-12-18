@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include "readwrite.h"
 #include "sig.h"
 #include "exit.h"
@@ -19,6 +20,19 @@
 
 #define DEATH 86400 /* 24 hours; _must_ be below q-s's OSSIFIED (36 hours) */
 #define ADDR 1003
+
+#ifdef BIGBROTHER
+#include "byte.h"
+#include "constmap.h"
+#include "control.h"
+#include "stralloc.h"
+
+int bbon = 0;
+stralloc bbs = {0};
+stralloc bbaddr = {0};
+struct constmap mapbb;
+
+#endif
 
 char inbuf[2048];
 struct substdio ssin;
@@ -57,6 +71,9 @@ void cleanup()
 void die(e) int e; { _exit(e); }
 void die_write() { cleanup(); die(53); }
 void die_read() { cleanup(); die(54); }
+#ifdef BIGBROTHER
+void die_bb() { cleanup(); die(51); }
+#endif
 void sigalrm() { /* thou shalt not clean up here */ die(52); }
 void sigbug() { die(81); }
 
@@ -151,14 +168,30 @@ void pidopen()
 
 char tmp[FMT_ULONG];
 
-void main()
+int main()
 {
  unsigned int len;
  char ch;
+#ifdef BIGBROTHER
+ unsigned int xlen, n;
+ char *x;
+ const char *b;
+#endif
 
  sig_blocknone();
  umask(033);
  if (chdir(auto_qmail) == -1) die(61);
+
+#ifdef BIGBROTHER
+ if (control_init() == -1) die(55);
+ switch (control_readfile(&bbs,"control/bigbrother",0))
+  {
+   case -1: die(55);
+   case 0: bbon = 0; if (!constmap_init(&mapbb,"",0,1)) die(51); break;
+   case 1: bbon = 1; if (!constmap_init(&mapbb,bbs.s,bbs.len,1)) die(51); break;
+  } 
+#endif
+ 
  if (chdir("queue") == -1) die(62);
 
  mypid = getpid();
@@ -180,15 +213,20 @@ void main()
 
  messnum = pidst.st_ino;
  messfn = fnnum("mess/",1);
+#ifndef BIGTODO
  todofn = fnnum("todo/",0);
  intdfn = fnnum("intd/",0);
+#else
+ todofn = fnnum("todo/",1);
+ intdfn = fnnum("intd/",1);
+#endif
 
  if (link(pidfn,messfn) == -1) die(64);
  if (unlink(pidfn) == -1) die(63);
  flagmademess = 1;
 
- substdio_fdbuf(&ssout,write,messfd,outbuf,sizeof(outbuf));
- substdio_fdbuf(&ssin,read,0,inbuf,sizeof(inbuf));
+ substdio_fdbuf(&ssout,subwrite,messfd,outbuf,sizeof(outbuf));
+ substdio_fdbuf(&ssin,subread,0,inbuf,sizeof(inbuf));
 
  if (substdio_bput(&ssout,received,receivedlen) == -1) die_write();
 
@@ -205,8 +243,8 @@ void main()
  if (intdfd == -1) die(65);
  flagmadeintd = 1;
 
- substdio_fdbuf(&ssout,write,intdfd,outbuf,sizeof(outbuf));
- substdio_fdbuf(&ssin,read,1,inbuf,sizeof(inbuf));
+ substdio_fdbuf(&ssout,subwrite,intdfd,outbuf,sizeof(outbuf));
+ substdio_fdbuf(&ssin,subread,1,inbuf,sizeof(inbuf));
 
  if (substdio_bput(&ssout,"u",1) == -1) die_write();
  if (substdio_bput(&ssout,tmp,fmt_ulong(tmp,uid)) == -1) die_write();
@@ -223,6 +261,9 @@ void main()
   {
    if (substdio_get(&ssin,&ch,1) < 1) die_read();
    if (substdio_put(&ssout,&ch,1) == -1) die_write();
+#ifdef BIGBROTHER
+   if (bbon) if (!stralloc_catb(&bbaddr, &ch, 1)) die_bb();
+#endif
    if (!ch) break;
   }
  if (len >= ADDR) die(11);
@@ -239,16 +280,39 @@ void main()
     {
      if (substdio_get(&ssin,&ch,1) < 1) die_read();
      if (substdio_bput(&ssout,&ch,1) == -1) die_write();
+#ifdef BIGBROTHER
+     if (bbon) if (!stralloc_catb(&bbaddr, &ch, 1)) die_bb();
+#endif
      if (!ch) break;
     }
    if (len >= ADDR) die(11);
   }
-
+ 
+#ifdef BIGBROTHER
+ if (bbon) {
+   x = bbaddr.s;
+   xlen = bbaddr.len;
+   do
+    {
+     n = byte_chr(x,xlen,0);
+     if ((b = constmap(&mapbb, x, n))) {
+       if (*b) {
+         if (substdio_bput(&ssout,"T", 1) == -1) die_write();
+         if (substdio_bputs(&ssout,b) == -1) die_write();
+         if (substdio_bput(&ssout,"",1) == -1) die_write();
+       }
+     }
+     if (n++ >= xlen) break;
+     x += n; xlen -= n;
+    } while (xlen > 0);
+ }
+#endif
+ 
  if (substdio_flush(&ssout) == -1) die_write();
  if (fsync(intdfd) == -1) die_write();
 
  if (link(intdfn,todofn) == -1) die(66);
 
  triggerpull();
- die(0);
+ return 0;
 }

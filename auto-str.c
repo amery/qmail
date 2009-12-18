@@ -1,17 +1,17 @@
-#include "substdio.h"
 #include "readwrite.h"
+#include "substdio.h"
 #include "exit.h"
 
 char buf1[256];
-substdio ss1 = SUBSTDIO_FDBUF(write,1,buf1,sizeof(buf1));
+substdio ss1 = SUBSTDIO_FDBUF(subwrite,1,buf1,sizeof(buf1));
 
-void puts(s)
+void putstr(s)
 char *s;
 {
   if (substdio_puts(&ss1,s) == -1) _exit(111);
 }
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
@@ -25,20 +25,20 @@ char **argv;
   value = argv[2];
   if (!value) _exit(100);
 
-  puts("char ");
-  puts(name);
-  puts("[] = \"\\\n");
+  putstr("char ");
+  putstr(name);
+  putstr("[] = \"\\\n");
 
-  while (ch = *value++) {
-    puts("\\");
+  while ((ch = *value++)) {
+    putstr("\\");
     octal[3] = 0;
     octal[2] = '0' + (ch & 7); ch >>= 3;
     octal[1] = '0' + (ch & 7); ch >>= 3;
     octal[0] = '0' + (ch & 7);
-    puts(octal);
+    putstr(octal);
   }
 
-  puts("\\\n\";\n");
+  putstr("\\\n\";\n");
   if (substdio_flush(&ss1) == -1) _exit(111);
-  _exit(0);
+  return 0;
 }

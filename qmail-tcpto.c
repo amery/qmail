@@ -1,5 +1,6 @@
 /* XXX: this program knows quite a bit about tcpto's internals */
 
+#include <unistd.h>
 #include "substdio.h"
 #include "subfd.h"
 #include "auto_qmail.h"
@@ -10,12 +11,15 @@
 #include "exit.h"
 #include "datetime.h"
 #include "now.h"
+#include "open.h"
+#include "readwrite.h"
+#include "byte.h"
 
 void die(n) int n; { substdio_flush(subfdout); _exit(n); }
 
-void warn(s) char *s;
+void warn(s) const char *s;
 {
- char *x;
+ const char *x;
  x = error_str(errno);
  substdio_puts(subfdout,s);
  substdio_puts(subfdout,": ");
@@ -32,7 +36,7 @@ char tcpto_buf[1024];
 
 char tmp[FMT_ULONG + IPFMT];
 
-void main()
+int main()
 {
  int fdlock;
  int fd;
@@ -82,4 +86,6 @@ void main()
   }
 
  die(0);
+ /* NOTREACHED */
+ return 0;
 }

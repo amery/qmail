@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "getln.h"
 #include "substdio.h"
 #include "subfd.h"
@@ -28,7 +29,7 @@ void addtext(s,n) char *s; int n;
 void dobody(h) stralloc *h; { addtext(h->s,h->len); }
 void doheader(h) stralloc *h;
 {
- int i;
+ unsigned int i;
  switch(hfield_known(h->s,h->len))
   {
    case H_SUBJECT:
@@ -58,11 +59,11 @@ prioq pq = {0};
 char inbuf[SUBSTDIO_INSIZE];
 substdio ssin;
 
-void main()
+int main()
 {
  struct prioq_elt pe;
  int fd;
- int i;
+ unsigned int i;
 
  if (maildir_chdir() == -1)
    strerr_die1(111,FATAL,&maildir_chdir_err);
@@ -81,7 +82,7 @@ void main()
 
      fd = open_read(filenames.s + pe.id);
      if (fd == -1) continue;
-     substdio_fdbuf(&ssin,read,fd,inbuf,sizeof(inbuf));
+     substdio_fdbuf(&ssin,subread,fd,inbuf,sizeof(inbuf));
 
      if (!stralloc_copys(&sender,"?")) die_nomem();
      if (!stralloc_copys(&recipient,"?")) die_nomem();
@@ -122,4 +123,6 @@ void main()
    substdio_flush(subfdout);
    sleep(30);
   }
+ /* NOTREACHED */
+ return 1;
 }

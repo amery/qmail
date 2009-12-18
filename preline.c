@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "fd.h"
 #include "sgetopt.h"
 #include "readwrite.h"
@@ -23,10 +24,10 @@ int flagdtline = 1; char *dtline;
 
 char outbuf[SUBSTDIO_OUTSIZE];
 char inbuf[SUBSTDIO_INSIZE];
-substdio ssout = SUBSTDIO_FDBUF(write,1,outbuf,sizeof outbuf);
-substdio ssin = SUBSTDIO_FDBUF(read,0,inbuf,sizeof inbuf);
+substdio ssout = SUBSTDIO_FDBUF(subwrite,1,outbuf,sizeof outbuf);
+substdio ssin = SUBSTDIO_FDBUF(subread,0,inbuf,sizeof inbuf);
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
@@ -86,5 +87,5 @@ char **argv;
     strerr_die2sys(111,FATAL,"wait failed: ");
   if (wait_crashed(wstat))
     strerr_die2x(111,FATAL,"child crashed");
-  _exit(wait_exitcode(wstat));
+  return wait_exitcode(wstat);
 }

@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "stralloc.h"
 #include "substdio.h"
 #include "qmail.h"
@@ -11,11 +12,12 @@
 #include "readwrite.h"
 #include "control.h"
 #include "received.h"
+#include "scan.h"
 
 void badproto() { _exit(100); }
 void resources() { _exit(111); }
 
-int safewrite(fd,buf,len) int fd; char *buf; int len;
+int safewrite(int fd, void *buf, int len)
 {
   int r;
   r = write(fd,buf,len);
@@ -26,7 +28,7 @@ int safewrite(fd,buf,len) int fd; char *buf; int len;
 char ssoutbuf[256];
 substdio ssout = SUBSTDIO_FDBUF(safewrite,1,ssoutbuf,sizeof ssoutbuf);
 
-int saferead(fd,buf,len) int fd; char *buf; int len;
+int saferead(int fd, void *buf, int len)
 {
   int r;
   substdio_flush(&ssout);
@@ -38,14 +40,15 @@ int saferead(fd,buf,len) int fd; char *buf; int len;
 char ssinbuf[512];
 substdio ssin = SUBSTDIO_FDBUF(saferead,0,ssinbuf,sizeof ssinbuf);
 
-unsigned long getlen()
+unsigned long getlen(void)
 {
   unsigned long len = 0;
   char ch;
   for (;;) {
     substdio_get(&ssin,&ch,1);
-    if (ch == ':') return len;
     if (len > 200000000) resources();
+    if (ch == ':') return len;
+    if (ch < '0' || ch > '9') badproto();
     len = 10 * len + (ch - '0');
   }
 }
@@ -57,36 +60,35 @@ void getcomma()
   if (ch != ',') badproto();
 }
 
-unsigned int databytes = 0;
-unsigned int bytestooverflow = 0;
+unsigned long databytes = 0;
+unsigned long bytestooverflow = 0;
 struct qmail qq;
 
 char buf[1000];
 char buf2[100];
 
-char *remotehost;
-char *remoteinfo;
-char *remoteip;
-char *local;
+const char *remotehost;
+const char *remoteinfo;
+const char *remoteip;
+const char *local;
 
 stralloc failure = {0};
 
 char *relayclient;
-int relayclientlen;
+unsigned int relayclientlen;
 
-main()
+int main()
 {
   char ch;
-  int i;
+  unsigned int i;
   unsigned long biglen;
   unsigned long len;
   int flagdos;
   int flagsenderok;
   int flagbother;
   unsigned long qp;
-  char *result;
+  const char *result;
   char *x;
-  unsigned long u;
  
   sig_pipeignore();
   sig_alarmcatch(resources);
@@ -99,9 +101,9 @@ main()
   relayclient = env_get("RELAYCLIENT");
   relayclientlen = relayclient ? str_len(relayclient) : 0;
  
-  if (control_readint(&databytes,"control/databytes") == -1) resources();
+  if (control_readulong(&databytes,"control/databytes") == -1) resources();
   x = env_get("DATABYTES");
-  if (x) { scan_ulong(x,&u); databytes = u; }
+  if (x) scan_ulong(x,&databytes);
   if (!(databytes + 1)) --databytes;
  
   remotehost = env_get("TCPREMOTEHOST");
@@ -113,6 +115,7 @@ main()
   if (!local) local = env_get("TCPLOCALIP");
   if (!local) local = "unknown";
  
+  flagdos = 0;
   for (;;) {
     if (!stralloc_copys(&failure,"")) resources();
     flagsenderok = 1;
@@ -130,7 +133,7 @@ main()
     else if (ch == 13) flagdos = 1;
     else badproto();
  
-    received(&qq,"QMTP",local,remoteip,remotehost,remoteinfo,(char *) 0);
+    received(&qq,"QMTP",local,remoteip,remotehost,remoteinfo,(char *) 0,(char *) 0,(char *) 0);
  
     /* XXX: check for loops? only if len is big? */
  
@@ -192,8 +195,9 @@ main()
         if (!biglen) badproto();
         substdio_get(&ssin,&ch,1);
         --biglen;
-        if (ch == ':') break;
         if (len > 200000000) resources();
+        if (ch == ':') break;
+	if (ch < '0' || ch > '9') badproto();
         len = 10 * len + (ch - '0');
       }
       if (len >= biglen) badproto();
@@ -265,4 +269,6 @@ main()
  
     /* ssout will be flushed when we read from the network again */
   }
+  /* NOTREACHED */
+  return 0;
 }

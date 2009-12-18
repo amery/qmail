@@ -10,7 +10,7 @@
 #include "fmt.h"
 
 char buf[800]; /* syslog truncates long lines (or crashes); GPACIC */
-int bufpos = 0; /* 0 <= bufpos < sizeof(buf) */
+unsigned int bufpos = 0; /* 0 <= bufpos < sizeof(buf) */
 int flagcont = 0;
 int priority; /* defined if flagcont */
 char stamp[FMT_ULONG + FMT_ULONG + 3]; /* defined if flagcont */
@@ -45,7 +45,7 @@ void flush()
   bufpos = 0;
 }
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
@@ -69,4 +69,6 @@ char **argv;
     if ((ch < 32) || (ch > 126)) ch = '?'; /* logger truncates at 0; GPACIC */
     buf[bufpos++] = ch;
   }
+  /* NOTREACHED */
+  return 0;
 }

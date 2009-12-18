@@ -1,6 +1,6 @@
 #ifndef DNSDOE_H
 #define DNSDOE_H
 
-extern void dnsdoe();
+extern void dnsdoe(int);
 
 #endif

@@ -1,0 +1,1271 @@
+QMAIL_LDAP by Andre Oppermann <opi@nrg4u.com>,
+Claudio Jeker <jeker@n-r-g.com> and Boris Lutz <lutz@n-r-g.com>
+(c) 1998-2004 Internet Business Solutions AG
+
+The qmail-ldap patch for qmail comes with NO WARRANTY.
+
+This patch is under the BSD license. See LICENSE.
+
+RELEASE: current ($Date: 2005/04/01 13:18:30 $)
+
+TOC:
+ INSTALL                        how to install the patch
+ CONFIG FILES                   all about the extra config file
+ DEFAULT LDAP FIELDS            all about the fields in ldap
+ EXAMPLES                       example ldif and slapd.conf
+ MAILINGLIST, BUGS & PROBLEMS   How to help us helping you
+
+TODO:
+
+ see QLDAPTODO
+
+NEWS:
+
+ see QLDAPNEWS
+
+IMPORTANT NEWS:
+
+ - From release 20030901 on we broke certain backwards compatibility with
+   release 20030801 and prior releases for clarity and cleanup reasons!!
+
+ - New qmailGroup attribute "bounceadmin", see QLDAPGROUP for more info
+
+ - and as always a lot of smaller patches see QLDAPNEWS
+
+================================================================================
+
+INSTALL:
+
+1. Make sure you have fairly good knowledge of qmail and LDAP
+   READ THEIR FAQs. PLEASE.
+
+2. Read this document. THIS IS IMPORTANT, this is no 
+   ./configure; make; make install software.
+   If you are not familiar with compiling software you should definitifly
+   read http://www.lifewithqmail.org/ldap/ first.
+
+3. You need the following compiled and installed
+    - OpenLDAP 2.x or higher (others might also work)
+      OpenLDAP releases < 2.0 should no longer be used (you have been warned).
+   and
+    - OpenSSL 0.9.4 or higher if you want TLS SMTP encrytion
+
+   We recommend also using Dan Bernstein's toolset daemontools-0.76,
+   ucspi-tcp-0.88 and djbdns-1.05 to run qmail.
+
+   If you have problems with OpenLDAP look into their FAQ. The same for
+   OpenSSL.
+   You NEED knowledge of LDAP so READ their FAQ and/or man pages.
+
+4. Apply the qmail-ldap patches to a clean qmail-1.03 source tree
+   normaly "cd qmail-1.03_source_tree; patch -p1 < location_of_patch"
+   works ;-). There seems to be a problem with the original patch utility
+   on Solaris based systems, use the gnu patch utility instead.
+   A pre-compiled binary should be available at http://www.sunfreeware.com/
+   or on many mirrors around the world.
+
+   NOTE: the qmail-ldap patches need to be applied to a clean qmail-1.03 tree
+         not netqmail. All netqmail patches have been integrated into qmail-ldap
+         a long time ago.
+
+5. Edit the conf-* files and the top of the Makefile (only the top ;-) )
+   You can set/change:
+   - LDAPFLAGS=
+               -DALTQUEUE (to enable alternate queue selection via environment
+                variable QMAILQUEUE. Also known as qmailqueue patch.)
+               -DBIGBROTHER (turn on per address queue extra feature see the
+                section about the ~control/bigbrother control file)
+               -DBIGTODO (to enable the big todo patch, can be used together
+                with EXTERNAL_TODO)
+               -DBIND_8_COMPAT needed on system with new incompatible
+                bind9 header files. Currently this is necessary on MacOS X 10.3.
+               -DCLEARTEXTPASSWD (for cleartext passwords in ldap, bad idea)
+               -DDASH_EXT (turn on dash_ext support see 5.3)
+               -DDATA_COMPRESS (to enable smtp on the fly data compression.
+                It is needed to set ZLIB accordingly.)
+               -DEXTERNAL_TODO (to use the external high-performancer
+               -DQLDAP_CLUSTER (turns the cluster support on)
+                todo processing)
+               -DQMQP_COMPRESS (to enable QMQP on the fly data compression.
+                Can be used in clusters. It is needed to set ZLIB accordingly.
+                IMPORTANT: this breaks compatibility with the stock qmqp
+                protocol. So either all qmail-qmqpc/-qmqpd use the on the fly
+                compression or non.)
+               -DSMTPEXECCHECK (to enable Russell Nelsons antivirus patch
+	        for qmail-smtpd. To turn it on set the REJECTEXEC env-var.)
+               -DDUPEALIAS (to make migration from some X.400 messaging
+                systems easier. See QLDAPNEWS 20031101 for more information.)
+
+   - LDAPLIBS: the libraries you need for ldap, e.g. -lldap -llber
+     NOTE: on Solaris Systems you probably need also -lnsl -lsocket
+           newer OpenLDAP libs my need also -lresolv (DNS support).
+           It is also good to set the ld runpath with the -R switch
+           for more info ld(1) or gcc(1) and 
+           http://www.lifewithqmail.org/ldap/.
+   - LDAPINCLUDES: perhaps you need a special include-path for ldap
+     NOTE: if you need this you may run into shared library problems
+           see http://www.lifewithqmail.org/ldap/.
+
+   - ZLIB is used when DATA_COMPRESS and QMAP_COMPRESS is defined. Normaly
+     -lz should work, if libz is installed in a different location use
+     -L/path/to/zlibdir -lz
+   - MNW=-DMAKE_NETSCAPE_WORK (turns on the patch that fixes the problem 
+     with the Netscape download progress bar and qmail-pop3d)
+
+   - MDIRMAKE=-DAUTOMAILDIRMAKE (turns the auto-MAILdir-make-patch on)
+   - HDIRMAKE=-DAUTOHOMEDIRMAKE (compiles the auto-HOMEdir-make-patch 
+     into the release, you need the ~control/dirmaker file to turn the 
+     patch on, see CONFIG FILES)
+
+   - SHADOWLIBS=-lcrypt is needed on most systems (except my OpenBSD box :-) )
+     SHADOWLIBS=-lcrypt -lshadow , SHADOWOPTS=-DPW_SHADOW are needed on some 
+     Systems (Solaris, Linux) for local password lookups 
+     (just like the original djb-checkpassword. See Makefile.)
+   - DEBUG=-DDEBUG (compiles debugging into the auth modules and qmail-ldap, 
+     see also 10.)
+   - TLS* stuff for TLS (SMTP encryption) mostly self explaining
+
+5.1 Have a look at qmail-ldap.h, perhaps you want to change something there.
+     LDAP_CATCH_ALL: used for catching mails for a specific domain.
+                     Also used for extension nameing with DASH_EXT.
+     QUOTA_WARNING_LEVEL: triger level for quotawarning in percent.
+     *ID_{MAX,MIN}:  upper and lower limit for uid's and gid's.
+     RESTRICT_PROG:  restrict delivery programm pathes to non special shell
+                     characters. See also next section 5.2
+     ALIASDEVNULL:   replacement for the std. aliasempty for user with
+                     neither homeDirectory nor mailMessageStore defined.
+     QLDAP_TIMEOUT:  Default ldap search timeout. In seconds.
+     LDAP_*:         Names of the ldap fields used for lookups.
+     DOTMODE_*:      Names for the different dot modes.
+     MODE_*:         Names for the different delivery modes.
+     ISACTIVE_*:     Names for the account status.
+
+5.2 Have a look at check.c if you want to change the ldap field check behaviour
+    In the standart patch we check for this (in regexp form):
+     user: [a-zA-Z0-9@_.][a-zA-Z0-9@_.-]* (for the LDAP_UID field)
+     path: [a-zA-Z0-9@_./:=][a-zA-Z0-9@_.-/:=]* 
+           (for LDAP_MAILSTORE and LDAP_HOMEDIR)
+     prog: [a-zA-Z0-9@_./:=\\\t\n "'+,][a-zA-Z0-9@_.-/:=\\\t\n "'+,]* 
+           (for LDAP_PROGRAM with RESTRICT_PROG on, if RESTRICT_PROG is 0
+           then most shell escape characters are also allowed. e.g [$#!%&()*;])
+
+5.3 Note on DASH_EXT:
+    Finally we added a variation of Henning Brauer's dash-ext patch. The main
+    difference is the way it handels the extensions.
+    Example lookup scheme:
+      aaaa-bbbb-cccc@domain.tld
+      aaaa-bbbb-CATCHALL@domain.tld
+      aaaa-CATCHALL@domain.tld
+      CATCHALL@domain.tld
+    where CATCHALL is replaced with the value of LDAP_CATCH_ALL defined
+    in qmail-ldap.h. If CATCHALL is set to "default" instead of the standart
+    "catchall" it is almost stock qmails behaviour.
+    Note: Only up to four levels of dash extensions are checked to prevent
+    DoS attacks. You can change that in qmail-ldap.h via DASH_EXT_LEVELS.
+
+6.  Compile and install the stuff (it's the same as in standard qmail
+    install -> HINT: read the INSTALL and the FAQ file!!! :) ).
+    Now everything should be installed with correct permissions.
+
+6.1 If "make setup check" fails with an error like this:
+       /usr/local/lib/libldap.so: undefined reference to `res_query' 
+       /usr/local/lib/libldap.so: undefined reference to `dn_expand'
+       collect2: ld returned 1 exit status
+       make: *** [qmail-lspawn] Error 1
+    You have forgotten to add -lresolv to LDAPLIBS.
+
+6.2 If using TLS you can use 'make cert' or 'make cert-req' to create TLS 
+    certificates
+
+7.  Create the LDAP user database and start the LDAP server
+    See qmail.schema for definition of all fields for OpenLDAP 2.x
+
+8.  Create the proper ~control/ldap* files for qmail-ldap
+    At least ldapserver and ldapbasedn must exist (and also 'me')
+
+9.  Test and Enjoy!
+
+10. Debugging: as said befor you can compile qmail-lspawn and the auth modules 
+    with a flexible debugging facility (option DEBUG).
+    The debug output gets logged through splogger or your favorite logging tool 
+    connected to stderr for tcpserver-pop/imap chain.
+    To turn on debugging you need only to define the LOGLEVEL environment 
+    variable (e.g. with env, env LOGLEVEL=3 qmail-start ...)
+    There are these LOGLEVEL:
+    LOGLEVEL=1   -> Errors
+    LOGLEVEL=2   -> Warnings
+    LOGLEVEL=4   -> Info
+    LOGLEVEL=8   -> Info^2
+    LOGLEVEL=16  -> Debug
+    LOGLEVEL=32  -> Debug^2
+    LOGLEVEL=64  -> LDAP Debug
+    LOGLEVEL=128 -> LDAP Debug^2
+    LOGLEVEL=256 -> PASSWD, this level is normaly off because it shows
+                    critical data (unencrypted and crypted passwords). To
+                    turn it on edit checkpassword.c and increase the level
+                    for init_debug().
+
+     WARNING: on production machines don't use levels higher 3 or you will get 
+              incredible huge logfiles.
+     NOTE: too high debuglevels are reduced to the maximum allowed debug level
+           if the level parameter in init_debug() is smaler.
+           The LOGLEVEL is compare with a bit mask, so that
+           LOGLEVEL=3 will report warnings and errors but LOGLEVEL=2 will
+           only report warnings.
+           With the new log support the environment variable is LOGLEVEL but
+           the old DEBUGLEVEL is still supported.
+           The new log support will no longer add the log output to bounce
+           messages.
+
+11. NOTE ABOUT POP/IMAP services
+    The stock qmail recomends that you use a program by the name 'checkpassword'
+    to do the authentication, like this:
+
+       pop3 stream tcp nowait root \
+       /var/qmail/bin/qmail-popup qmail-popup \
+       YOURHOST /bin/checkpassword /var/qmail/bin/qmail-pop3d Maildir
+
+    With the use of the LDAP patch, this have been slightly altered. We now use
+    a program by the name 'auth_pop' instead... Something like this (replacement
+    inetd.conf line):
+
+       pop3 stream tcp nowait root \
+       /var/qmail/bin/qmail-popup qmail-popup \
+       YOURHOST /var/qmail/bin/auth_pop /var/qmail/bin/qmail-pop3d Maildir
+
+
+    Same goes for the command 'auth_imap' if your IMAP server can use an 
+    external program for authentication. auth_imap was designed for 
+    courier-IMAP and should work with it out of the box. 
+    There is also a auth_ldap modul in courier-imap that should work too.
+    You can get courier-imap from http://www.inter7.com
+
+    auth_pop and auth_imap are part of this patch and will be installed with the
+    other qmail programs.
+
+================================================================================
+
+CONFIG FILES:
+
+~control/aliasempty
+OR
+~control/defaultdelivery
+
+ Default delivery mode used by and only by the startup scripts.
+ Default: ./Maildir/
+ Example: ./
+ Note: If you have a more complex default delivery you need to edit the
+       runscripts because qmail-pop3d and the imapd do not understand this
+       complex format.
+
+~control/locals.cdb
+
+ Replaces locals and is read by qmail-local and qmail-smtpd on the fly.
+ Default: locals
+ Note: You don't have to -HUP qmail-send for changes in locals.cdb to
+       take effect. As soon as you regenerate locals.cdb it will become
+       active. Use bin/qmail-cdb to create the locals.cdb file.
+       Alternatively you can do "make" in ~control/ directory. See the
+       Makefile for more information.
+       If this file exists locals is ignored.
+
+~control/rcpthosts.cdb
+
+ Replaces rcpthosts and morercpthosts.cdb and is read by qmail-smtpd on the fly.
+ Default: rcpthosts and morercpthosts.cdb
+ Note: qmail-smtpd reads locals(.cdb) as well and there is no need anymore
+       to replicate all domains here too. Only domains you are doing queueing
+       for must be listed here. As soon as you regenerate rcpthosts.cdb it will
+       become active. Use bin/qmail-cdb to create the rcpthosts.cdb file.
+       Alternatively you can do "make" in ~control/ directory. See the
+       Makefile for more information.
+       If this file exists rcpthosts and morercpthosts.cdb are ignored.
+
+~control/ldapserver
+
+ List of Hostnames or IP addresses of LDAP servers. One per line.
+ An additional port can be supplied with the host:port notation.
+ Required
+ Example:
+   ldap.nrg4u.com
+   ldap2.nrg4u.com
+   ldap3.nrg4u.com:1234
+
+~control/ldapbasedn
+
+ The base DN from where the search in the LDAP tree begins
+ Normaly required
+ Default: NULL
+ Example: o=Internet Pipeline, c=CH
+ Note: Referrals are ignored
+
+~control/ldapobjectclass
+
+ The ldap objectclass the search will be limited to
+ Default: NULL, will search all objectclasses
+ Example: qmailUser
+ Note: Can specify more than one, must then be written in ldap search syntax
+
+~control/ldaplogin
+
+ Username for the LDAP server connection
+ Default: NULL
+ Example: cn=qmail-ldap, o=Internet Pipeline, c=CH
+ Note: The user must have enough rights to lookup all user information
+
+~control/ldappassword
+
+ Password for the LDAP server connection
+ Default: NULL
+ Note: The password is in clear text. The file should be owned by root and
+       mode (600) rw-------. If rcpt verify or auth_smtp is used then the
+       permissions must be adjusted so that the qmail-smtpd user -- normaly
+       qmaild -- has read access.
+
+~control/ldapgrouplogin
+ 
+ Username for the qmail-group LDAP server connection.
+ Default: use the login specified in ~control/ldaplogin
+ Example: cn=qmail-group, o=Internet Pipeline, c=CH
+ Note: The user must have enough rights to lookup the mail attribute.
+       Also the ldap limit used for this user must be enough high.
+
+~control/ldapgrouppassword
+
+ Password for the qmail-group LDAP server connection.
+ Default: NULL only if ~control/ldapgrouplogin is present else fall back to
+          ~control/ldappassword
+ Note: The password is in clear text. The file should not be readable for
+       all.
+
+~control/ldaplocaldelivery
+
+ To lookup the local passwd file if the LDAP lookup finds no match. This
+ affects qmail-lspawn and auth_* if the LDAP lookup returns nothing.
+ Default: enabled
+ Example: 1
+ Note: boolean, use 0 (zero) or 1 (one)
+
+~control/ldaprebind
+
+ Use the possibility of rebinding to the ldap-server to compare pop3 
+ and imap passwords. So you can make your acl more restrictive.
+ Default: disabled
+ Example: 1
+ Note: boolean, use 0 (zero) or 1 (one)
+
+~control/ldapcluster
+
+ Turn clustering on and off. Needs a qmail-ldap compiled with 
+ -DQLDAP_CLUSTER or nothing will happen. Also don't forget to set up
+ qmail-qmqpd on all servers in the cluster.
+ Default: disabled
+ Example: 1
+ Note: boolean, use 0 (zero) or 1 (one)
+ ATTN: the control files me, rcpthosts and locals have to be set carfully
+       or you will have big problems.
+
+~control/ldapclusterhosts
+
+ ldapclusterhosts contains a number of hostnames (FQDM) to check togehter
+ with ~control/me when clustering is on. This file is useful if you want to
+ run multiple instances of qmail-ldap on one machine.
+ Default: none, in other words just check with ~control/me
+ Example: customersmtp.nrg4u.com
+ Note: multiline
+
+~control/defaultquotasize
+
+ The default amount of disk space the user can use until all further messages
+ get bounced back to the sender. Size is a byte count.
+ Default: unlimited
+ Example: 1000000 (max 1000000 bytes size)
+ Note: is overridden by mailQuota*, make sure to have set ~control/quotowarning
+       otherwise you will not get quota warning messages
+
+~control/defaultquotacount
+
+ The default maximum amount of messages the user can have until all further
+ messages get bounced back to the sender. Count is a file count.
+ Default: unlimited
+ Example: 1000 (max 1000 Mails)
+ Note: is overridden by mailQuota*, make sure to have set ~control/quotowarning
+       otherwise you will not get quota warning messages
+
+~control/ldapdefaultdotmode
+
+ The default interpretation of .qmail files
+ Default: ldaponly
+ Example: both
+ Values: both, dotonly, ldaponly, ldapwithprog
+ Note: Works only for deliveries based on LDAP lookups.
+       Local mails use dotonly like in normal qmail.
+
+~control/ldapmessagestore
+
+ The default prefix for non absolute path's in mailMessageStore, without 
+ heading '/'.
+ Default: NULL
+ Example: /maildisk
+ Note: Used in virtual users environments
+
+~control/ldapuid
+
+ The default UID used in virtual users environments. This value will be
+ used for ldap entries with no LDAP_QMAILUID (see below) field
+ Default: NULL
+ Example: 1010
+ Note: should be a real UID, must be above 100
+
+~control/ldapgid
+
+ The default GID used in virtual users environments. This value will be
+ used for ldap entries with no LDAP_QMAILGID (see below) field
+ Default: NULL
+ Example: 1010
+ Note: should be a real GID, must be above 100
+
+~control/ldaptimeout
+
+ The time the ldap search waits for a response from the ldap server
+ Default: 30 seconds
+ Example: 60
+ Note: in seconds, if it gets no response within this time it will
+       continue either with the next specified ldap server or it will
+       defer the delivery and try again later.
+
+~control/custombouncetext
+
+ Additional custom text in bounce messages, e.g. for providing contact
+ information of your ISP or messages in your language
+ Default: NULL
+ Example: You can contact us at (555) 555 5555
+ Note: Multiline
+       It MUST NOT contain a blank line ("\n\n") anywhere otherwise you 
+       break qsmbf. Use a line with one or more spaces ("\n \n") instead.
+       See http://cr.yp.to/proto/qsbmf.txt for more info.
+
+~control/quotawarning
+
+ Custom text in quota warning message, e.g. for providing contact information
+ of your ISP
+ Default: NULL
+ Example: You can contact us at (555) 555 5555
+ Note: Multiline. Needs to be present to make qmail-quotawarn work.
+       Supports the %HEADER% magic similar to qmail-reply. The headers From:,
+       Subject:, the content type headers and headers starting with X- can be
+       set. The value of the To: header is forced to the recipient address.
+       The %SUBJECT% magic of qmail-reply is not useful for a quotawarning and
+       therefor disabled.
+
+~control/dirmaker
+
+ Absolute path to your program/script that creates missing homedirs
+ Default: none (off)
+ Example: /var/qmail/bin/create_homedir
+ Note: the script is executeded after the setuid/gid, it isn't running
+       under root for security reasons.
+       The command is executed with execve not system 
+       (so mkdir --mode=700 -p does not work!) use a shell script. 
+       $1 is the homedir-path and $2 is aliasempty.
+       If you use $2 have a look at the first and last char to ensure that
+       it is a path to the maildir and not a pipe or mailbox delivery.
+       Possible very simple shell script:
+
+       -cut-
+       #!/bin/sh
+       mkdir -m 700 -p $1
+       #EOF
+       -cut-
+
+~control/relaymailfrom
+
+ This file contains envelope sender addresses that are allowed to relay through
+ this server.
+ Default: none
+ Example: user@domain or @domain
+ Note: Use with care, the envelope senders address can easily be spoofed and
+       then you are an open relay again. It is better to use a scheme like
+       POP before SMTP.
+
+~control/rbllist
+
+ Rbllist contains a number of RBL's to check for the given senders IP address.
+ The file consists of four tab or space separated fields.
+   basedomain: base domain address to lookup (e.g. relays.ordb.org)
+   action: one of addheader or reject.
+           addheader will just create a X-RBL: header whereas
+           reject will reject the smtp connection instantly with a 553 error.
+   matchon: any or IP-Address, if a IP-Address is specified the action is only
+            taken if the returned address form basedomain is equal to
+            IP-Address. With any all returned IP-Address will match.
+   message: message to be included in X-RBL: headers and 553 errors.
+
+ Possible example:
+  # baseaddress    action    matchon      Message
+  #========================================================================
+       sbl.spamhaus.org reject    127.0.0.2 See http://www.spamhaus.org/SBL
+        relays.ordb.org addheader 127.0.0.2 See http://www.ordb.org/faq/
+          list.dsbl.org addheader 127.0.0.2 See http://dsbl.org/main
+         bl.spamcop.net addheader 127.0.0.2 See http://spamcop.net/
+        relays.ordb.org reject    any       see http://ordb.org
+  spamguard.leadmon.net addheader 127.0.0.2 address is a dialup address
+
+ Default: none
+ Note: Multiline. To activate RBL checks you have to set RBL in qmail-smtpd's
+       environment (with tcpserver). See this website for more information on
+       available RBLs: http://www.declude.com/JunkMail/Support/ip4r.htm
+       The environment variable RBLONLYHEADER overrides any rejects and only
+       adds headers. This can be set by ip-range with tcpserver.
+
+~control/goodmailaddr
+
+ This file contains local recipient addresses that are always accepted in
+ conjunction with sender or recipient verify checks.
+ Default: none
+ Example: user@domain or @domain
+ Note: This is useful for things like <postmaster@domain.com> and other
+       addresses you always want to accept, even if they are not in the
+       ldap directory or when a lookup temporarly fails. See RCPTCHECK
+       and SENDERCHECK.
+
+~control/badrcptto
+
+ This file contains local recipient addresses that are rejected.
+ Default: none
+ Example: user@domain or @domain
+ Note: This can be useful if a spammer sends lots of messages to a
+       nonexistant user from an invalid address as otherwise postmaster
+       will get lots of double bounces.
+
+~control/badmailfrom-unknown
+
+ This file contains blocked addresses for server without a PTR RR.
+ This is useful to stop some spammer that use fake hotmail or yahoo
+ addresses but mail from home-pc without a PTR RR dns record.
+ Example: @hotmail.com
+ Note: Syntax as in ~control/badmailfrom.
+
+~control/bouncemaxbytes
+
+ This file contains the maximal number of bytes to be included in a bounce
+ message.
+ Default: 0 (off)
+ Example: 102400 (equivalent to 10kB)
+
+~control/smtpclustercookie
+
+ This file contains a cookie (random string) that is the same on all
+ smtp MX clusters. It is to prevent outgoing mails looping back because
+ of incorrect or faked MX records pointing to some external ip address
+ which qmail-remote does not recognise as in reality 'itself' (as seen
+ from the cluster perspective). The external ip address can be for example
+ a load balancer or a NAT device.
+ Default: none
+ Example: cvkmd9078923hjv4nkd890q3g
+ Note: String will be truncated after 32 characters. If qmail-remote
+       sees the same string advertised in qmail-smtpd greeting it will
+       abort the delivery attempt, bounce the message and report a smtp
+       loop error.
+
+~control/cert.pem
+
+ Certificate for qmail-smtp tls option. This file can be generated via "make
+ cert" or "make cert-req". The file needs to be readable for qmail-smtpd -- in
+ other words it needs to be readable for user qmaild.
+
+~control/outgoingip
+
+ This file contains the IP qmail-remote should bind to.
+ Default: 0.0.0.0
+ Example: 192.168.12.88
+
+~control/qmqpcip
+
+ This file contains the IP qmail-qmqpc should bind to.
+ Default: 0.0.0.0
+ Example: 192.168.12.88
+
+~control/bigbrother
+
+ This file is only used if BIGBROTHER was defined in the Makefile.
+ For ISP that need to implement some surveillance method because of some
+ beloved authoroties (like here in switzerland), you can enable a per
+ address queue extra feature. To automatically forward all mail to and from
+ badguy@badplace.ch to bigbrother@admin.ch you need to add followong line to
+ ~control/bigbrother: badguy@badplace.ch:bigbrother@admin.ch.
+ bigbrother@admin.ch can be a local, ldap or remote address.
+ Default: none (off)
+ Example: badguy@badplace.ch:bigbrother@admin.ch
+ Note: An extra recipient will be added in qmail-send. If the bigbrother
+       address causes a bounce the sender will see this bounce.
+
+~control/signatures
+
+ This file contains content signatures for the REJECTEXEC functionality.
+ Default: none
+ Example: TVqQAAMAA  (block some windows executables, exe|com|pif|scr)
+ Example: UEsDBAoAAAAAA*****DKJx+eAFgAAABYAA**AAAA  (block MyDoom)
+ Note: These signatures are matched for in the first line of mime
+       attachments. Be sure to make them as specific as possible
+       to avoid to have a too broad filter and matching valid
+       content. The asterisk (*) is a single placeholder that will
+       match any single character at that position. The signature
+       is litteraly matches and no decoding of mime attachments is
+       being done. Normally the signature contains the base64
+       encoded version of the string you want to match. Lines
+       starting with a hash sign (#) are ignored and can be used
+       for comments.
+       The default file contains signatures of Windows executable
+       files (exe|com|pif|scr, etc) and common email Virii at the
+       time of the current release.
+
+~control/smtpcert
+
+ This file contains the location of the SSL certificate used for smtps STARTTLS
+ feature. The path may be relative to /var/qmail or whatever was specified in
+ conf-qmail.
+ Default: none
+ Example: control/cert.pem
+
+~control/remotecert
+
+ This file contains the location of the OPTIONAL SSL certificate used for
+ outgoing SMTP sessions. The path may be relative to /var/qmail or whatever
+ was specified in conf-qmail.
+ Default: none
+ Example: control/cert.pem
+ Note: Unlike ~control/smtpcert this file is completle optional for encrypion.
+       qmail-remote will use STARTTLS and SSL encryption even without a cert
+       file, as it is not neccessary for the client.
+
+~control/tarpitcount
+~control/tarpitdelay
+~control/maxrcptcount
+~control/rblonlyheader
+~control/ldapdefaultquota
+~control/ldapusername
+~control/ldappasswdappend
+ NO LONGER USED, PLEASE REMOVE THESE FILES
+
+================================================================================
+
+Environment variables setable via tcpserver, envdir or plain old env/sh:
+
+AUTHPREPEND
+
+ String that is prepended to the login in the received line.
+ Default: off
+ Affects: qmail-smtpd
+ Example: "Authenticated user: "
+ Note: Just for additional information in the received line. You can use this
+       to make tracking of (ab)users easier.
+
+AUTHREQUIRED
+
+ Allow sending of messages (for this host and relaying) only to authenticated
+ senders.
+ Default: off
+ Affects: qmail-smtpd
+ Example: "" (any value will do)
+ Note: Use this only if all clients support AMTP-AUTH. Be careful not to block
+       remote mail servers sending messages for local users. This is only useful
+       if you want to restrict certain IP ranges (for example you dial-up or
+       other customers) to be able to send only as existing and valid users.
+
+BLOCKRELAYPROBE
+
+ Rejects recipients with and "!", "%" or double-"@"
+ Default: off
+ Affects: qmail-smtpd
+ Example: "" (any value will do)
+ Note: This is quite useful to stop so called anti-spam probes of clueless
+       and overzealus wannabe RBL operators. These probes try to exploit
+       some ancient sendwhale bugs never existent in qmail. Unfortunatly
+       qmail accepts such stuff even if it doesn't relays it and bounces
+       it later. "!" is the old UUCP bang path. "%" is a sendwhale relaying
+       hack and double-"@" a sendwhale bug.
+       Beware if you actually use the qmail percent-hack! Then this can't
+       be used obviously!
+
+LDAPSOFTOK
+
+ Treat ldap soft errors (ldap server unavailable, etc) as if the check was
+ successful and continue.
+ Default: off
+ Affects: qmail-smtpd
+ Example: "" (any value will do)
+ Note: Normally qmail-smtp will give a 450 temporary error if the ldap server
+       could not be successfuly queried. This changes to treat such errors as
+       if they had been successful. This is useful when it is more important
+       to keep the service available, even if the ldap server can't be queried
+       for some reason (down, unreachable, insufficient query rights, etc).
+
+LOGLEVEL
+
+ Level of log verbosity in qmail-smtpd.
+ Default: 0 (NULL)
+ Affects: qmail-smtpd
+ Example: 3
+ Levels:
+     0 = no logging
+     1 = fatal errors
+     2 = accounting
+     3 = connection setup and smtp errors
+     4 = verbose
+ Note: integer value, everything will be logged through tcpserver
+
+POP3_LOGLEVEL
+
+ Level of log verbosity in qmail-pop3d.
+ Default: 0 (NULL)
+ Affects: qmail-pop3d
+ Example: 3
+ Levels:
+     0 = no logging
+     1 = fatal errors
+     2 = login/logout accounting
+     3 = session errors
+     4 = verbose
+ Note: integer value, everything will be logged through tcpserver
+ Note2: this is a hack so that this log level does not interfere with the one
+        of auth_pop.
+
+LOGLEVEL or DEBUGLEVEL
+
+ Level of log verbosity in qmail-lspawn, auth_*
+ Default: 0 (NULL)
+ Levels:
+    LOGLEVEL=1   -> Errors
+    LOGLEVEL=2   -> Warnings
+    LOGLEVEL=4   -> Info
+    LOGLEVEL=8   -> Info^2
+    LOGLEVEL=16  -> Debug
+    LOGLEVEL=32  -> Debug^2
+    LOGLEVEL=64  -> LDAP Debug
+    LOGLEVEL=128 -> LDAP Debug^2
+    LOGLEVEL=256 -> PASSWD, this level is normaly off because it shows
+                    critical data (unencrypted and crypted passwords). To
+                    turn it on edit checkpassword.c and increase the level
+                    for init_debug().
+ WARNING: on production machines don't use levels higher 3 or you will get 
+          incredible huge logfiles.
+ NOTE: too high debuglevels are reduced to the maximum allowed debug level
+       if the level parameter in init_debug() is smaler.
+       The LOGLEVEL is compare with a bit mask, so that
+       LOGLEVEL=3 will report warnings and errors but LOGLEVEL=2 will
+       only report warnings.
+       Both names are supported with LOGLEVEL having the higher priority.
+
+MAXRCPTCOUNT
+
+ Maxrcptcount is the maximum number of RCPT TOs you accept before permanently
+ rejecting this delivery attempt.
+ Default: 0 (which means no unlimited)
+ Affects: qmail-smtpd
+ Example: 5
+ Note: This is a hard limit. If you just want to give some pain for smaller
+       recipient numbers consider tarpit use as well.
+
+NOBOUNCE
+
+ Rejects null sender bounces
+ Default: off
+ Affects: qmail-smtpd
+ Example: "" (any value will do)
+ Note: Use only in extreme cases and only for certain IP ranges. Blocking
+       bounces is considered harmful and strictly prohibited by RFC2821.
+       This can be useful if a spammer used your domain as sender and you
+       get all the bounces. Otherwise don't enable this! You want to get
+       bounces!
+
+NOCOMPRESS
+
+ Disables the dynamoc data compression in qmail-qmqpd.
+ Default: off
+ Affects: qmail-qmqpd
+ Example: "" (any value will do)
+
+NOPBS
+
+ Disable adding of pbs data. NOPBS disables the execution of pbsadd in auth_*.
+ Default: off
+ Affects: auth_pop, auth_imap & pbsadd
+ Example: "" (any value will do)
+ Note: this is manly useful to hinder adding informations of forwarder sessions.
+
+QMAILQUEUE
+
+ Use this queueing program instead of the default qmail-queue program.
+ Default: off
+ Affects: qmail-smtpd, qmail-qmtpd, qmail-qmqpd, qmail-inject,
+          but also qmail-local, qmail-reply, qmail-send, qreceipt, 
+          condredirect, forward
+ Example: /var/scanner/bin/qmail-scanner-queue.pl
+ Note: Using this for something different than the mail incomming daemons
+       is dissuaded.
+
+RBL
+
+ If set turns on rbl checking. See also section about the ~control/rbllist
+ control file.
+ Default: none
+ Affects: qmail-smtpd
+ Example: "" (any value will do)
+
+RBLONLYHEADER
+
+ Rblonlyheader causes qmail-smtpd not to reject the message in any case but
+ just to add a line with it's findings to the mail header.
+ Default: none
+ Affects: qmail-smtpd
+ Example: "" (any value will do)
+ Note: Add's a
+       "X-RBL: (relays.ordb.org) matches with 127.0.0.2 and tells us go home"
+       header to the message for later filtering.
+
+RCPTCHECK
+
+ Check if the recipient (envelope "rcpt to:") of a message really exists. If not
+ give a 550 reject right now instead of bouncing later in qmail-lspawn.
+ Default: off
+ Affects: qmail-smtpd
+ Example: "" (any value will do)
+ Note: Only applies to recipients whose domain is listed in ~control/locals.
+       Recipients domains listed in ~control/rcpthosts are allowed without
+       further checks. If RELAYCLIENT is set, all other recipients are allowed
+       as well. Addresses or domains listed in ~control/goodmailaddr are
+       unconditionally allowed in all cases.
+
+REJECTEXEC
+
+ Reject DOS/Windows executables in mail attachements.
+ Default: off
+ Affects: qmail-smtpd
+ Example: "" (any value will do)
+ Note: This patch does not distinguish between valid applications and
+       evil viruses and trojans so handle with care. It is not a 100%
+       guaranteed protection but it handles a lot of unwanted stuff.
+       The file ~control/signatures contains signatures for matching
+       of mime attachments.
+
+RETURNMXCHECK
+
+ Rejects senders if they don't have a valid return MX
+ Default: off
+ Affects: qmail-smtpd
+ Example: "" (any value will do)
+ Note: This is quite useful even though it doesn't stops many spammers
+       today. But it ensures that you can send an email or a bounce
+       back to the sender. It is also useful for your own users/customers
+       because if they type a nonexistent sender into their "from" field
+       (typos!) it'll stop them the first time instead of getting help-
+       desk calls when nobody can reply to them.
+
+SANITYCHECK
+
+ Rejects senders without an @, no . in domain part or too long/short TLD
+ Default: off
+ Affects: qmail-smtpd
+ Example: "" (any value will do)
+ Note: Rejects stuff which you probably don't want on your mailserver
+       because it's highly likely that it'll bounce later.
+
+SENDERCHECK
+
+ Check if the sender (envelope "mail from:") of a message really exists (in the
+ ldap directory). If not give a 550 reject right now.
+ Default: off
+ Affects: qmail-smtpd
+ Example: "" or "LOOSE" or "STRICT"
+ Note: Only applies to senders whose domain is listed in ~control/locals.
+       Everything else is assumed to be an external message with a foreign
+       sender coming in, so no check applied. This is normal mode.
+       Setting to "LOOSE" will allow only senders which are listed either in
+       ~control/locals or ~control/rcpthosts. Setting to "STRICT" will only
+       allow senders which are listed in ~control/locals. With this you can
+       enforce for example that people from certain ip ranges can only send
+       if they have a valid existing email address with you.
+       Addresses or domains listed in ~control/goodmailaddr are unconditionally
+       allowed in all cases.
+
+SSLCERT
+
+ Path to the SSL certificate qmail-smtpd should use for STARTTLS. Overrides
+ ~control/smtpcert.
+ Default: none, ~control/smtpcert will be used
+ Example: /var/qmail/boot/qmail-smtpd/cert.pem
+
+SMTPAUTH
+
+ Enables SMTP-AUTH for remote clients. Authenticated clients are allowed to
+ relay through this server and their login is being recorded in the received
+ line.
+ Default: off
+ Affects: qmail-smtpd
+ Example: "TLSREQUIRED" or "" (any value will do)
+ Note: With SMTP-AUTH remote users can use this mail server for relaying.
+       SMTP is unencrypted and auth passwords are in clear text equivalent
+       base64 encoding. With TLSREQUIRED enabled SMTP-AUTH is only accepted
+       when the SMTP session is TLS encrypted to prevent password sniffing.
+       TLSREQUIRED requires TLS option to be compiled into qmail-ldap.
+
+SMTP550DISCONNECT
+
+ Disconnect the SMTP session if a 5xx is produced by the sender
+ Default: off
+ Affects: qmail-smtpd
+ Example: "" (any value will do)
+ Note: This is useful if you have a spammer trying different senders or
+       recipients in the same session separated by rset's.
+
+TARPITCOUNT
+
+ Tarpitcount is the number of RCPT TOs you accept before you start tarpitting.
+ Default: 0 (which means no tarpitting)
+ Affects: qmail-smtpd
+ Example: 5
+ Note: This number should be smaller than MAXRCPTCOUNT to have any effect.
+
+TARPITDELAY
+
+ Tarpitdelay is the number of seconds of delay to introduce after each
+ subsequent RCPT TO.
+ Default: 5
+ Affects: qmail-smtpd
+ Example: 10
+ Note: Connection which are tarpitted take a long time to finish. Be aware
+       that this ties up the available qmail-smtpd slots. Raise connection
+       limits with tcpserver if neccessary.
+
+421GREETING
+
+ Rejects a connection right away with a 421 in the greeting line and
+ starts in a dummy mode where only QUIT works unless 421GREETING is set -- in
+ that case the connection will closed immediatly after printing the greeting. 
+ Default: off
+ Affects: qmail-smtpd
+ Example: ""
+ Example: "Go away!"
+ Note: You can set this in tcpserver if you want to reject messages from
+       an ip address temporarily. If no string is given it will default
+       to "Service temporarily not available (#4.3.2)".
+       The timeout is reduced to 20 seconds to prevent starvation.
+
+550GREETING
+
+ Rejects a connection right away with a 550 in the greeting line and
+ starts in a dummy mode where only QUIT works unless 421GREETING is set -- in
+ that case the connection will closed immediatly after printing the greeting. 
+ Default: off
+ Affects: qmail-smtpd
+ Example: ""
+ Example: "Go away!"
+ Note: You can set this in tcpserver if you want to reject messages from
+       an ip address permanently. If no string is given it will default
+       to "Sorry, your message has been administratively denied. (#5.7.1)".
+       The timeout is reduced to 20 seconds to prevent starvation.
+       550GREETING has precedence over 421GREETING.
+
+
+================================================================================
+
+DEFAULT LDAP PARAMETER FIELDS:
+NOTE: keywords have to match exactly, so pay attention.
+      All fieldnames and keywords can be changed at compile time.
+      Just have a look at qmail-ldap.h.
+      
+LDAP_MAIL (default: "mail")
+
+ The users email address
+ Required
+ Example: jdoe@foo.bar
+
+
+LDAP_MAILALTERNATE (default: "mailAlternateAddress")
+
+ Secondary (alias) mailaddresses for the same user
+ Example: jd@foo.bar
+ Note: multifield
+
+
+LDAP_UID (default: "uid")
+
+ The username for POP3 and IMAP delivery
+ Required
+ Example: jdoe
+ Note: this name will also be set as $USER for qmail-local and program delivery.
+
+
+LDAP_QMAILUID (default: "qmailUID")
+
+ UID of the user on the mailsystem
+ Example: 1010
+ Note: Can be omitted in a virtual users environment
+       but only if it is defined via the control file ~control/ldapuid 
+
+LDAP_QMAILGID (default: "qmailGID")
+
+ GID of the user on the mailsystem
+ Example: 1010
+ Note: Can be omitted in a virtual users environment
+       but only if it is defined via the control file ~control/ldapgid 
+
+
+LDAP_PASSWD (default: "userPassword")
+
+ The password for POP3/IMAP authentication
+ Example: {MD5}uSI59Zyfa5lapBLGfJrD+g==
+ Note: Can be encrypted with {SHA}, {SSHA}, {MD5}, {SMD5}, {MD4}, {RMD160},
+       {RMD160}, {NS-MTA-MD5},
+       {crypt} crypt (without {crypt} prefix) or cleartext (only if compiled 
+       with -DCLEARTEXTPASSWD (a bad idea on production systems)).
+       If you rebind to the ldapserver don't use {NS-MTA-MD5}, {RMD160} and
+       probably {MD4}. These algorithms are sometimes not supported by the 
+       ldap servers, so check with their documentation.
+       To generate passwords you can use the included tool 'digest'.
+
+
+LDAP_MAILSTORE (default: "mailMessageStore")
+and
+LDAP_HOMEDIR (default: "homeDirectory")
+
+ Path to the maildir/mbox on the mail system is extracted from those fields.
+ If LDAP_HOMEDIR is found this field is used as $HOME, using aliasempty or
+ mailMessagestore if defined as default delivery method.
+ If only LDAP_MAILSTORE is defined this will be used as $HOME and aliasempty
+ as default delivery method.
+ If neither LDAP_MAILSTORE nor LDAP_HOMEDIR is defined, ~alias (qmails alias 
+ user homedir) will be used as $HOME and ALIASDEVNULL (defined in qmail-ldap.h)
+ as default delivery method. Also the delivery mode is set to ldap only and 
+ forward only (LDAP_DOTMODE and LDAP_MODE).
+ Example: /home/jdoe/
+ Note: LDAP_MAILSTORE can be written relative in a virtual users environment
+       ldapmailstore will be prefixed to make the path absolute.
+       For more info have a look at the QLDAPNEWS file.
+       If you use "homeDirectory" in an incompatible way then redefine it in
+       qldap-ldap.h to something not used, like "noHomeDirectory".
+
+
+LDAP_QUOTA_SIZE (default: "mailQuotaSize")
+LDAP_QUOTA_COUNT (default: "mailQuotaCount")
+
+ The amount of space the user can use until all further messages get bounced.
+ There are two possible limits, size (a byte count) and count (a file count).
+ Example: max 1000000 bytes size and max 1000 Mails
+            mailQuotaSize: 1000000
+            mailQuotaCount: 1000
+ Note:  a value of 0 means unlimited quota for that limit (count or size).
+ Note2: overrides defaultquotasize and defaultquotacount per user.
+        the old string forma (1000000S,1000C) is no longer supported.
+
+LDAP_MAXMSIZE (default: "mailSizeMax")
+
+ The maximum size (in bytes) that a single message may have. Everything over
+ this size gets bounced.
+ Example: 102400
+ Note: mailSizeMax has no influence on the datasize control file for the
+       smtp daemon. The mailSizeMax decision is not take until the mail is
+       delivered localy (by qmail-lspawn).
+
+
+LDAP_FORWARDS (default: "mailForwardingAddress")
+
+ Address(es) to forward all incoming messages for this user to.
+ Example: jdoe@new.place
+ Note: multifield. Forwards are done in addition to local (maildir/mbox)
+       delivery. Forwardings can be disabled without having to remove
+       the entries. See deliveryMode for more information on both.
+
+
+LDAP_PROGRAM (default: "deliveryProgramPath")
+
+ Program to execute for all incoming mails. Gets the message as input on stdin.
+ Example: /usr/bin/program -c -s
+ Note: multifield. The same as |/usr/bin/program -c -s in .qmail
+       Works only with qmailDotMode set to ldapwithprog or both.
+       With ldaponly set deliveryProgramPath is silently ignored.
+       Before using it have a look at QLDAPNEWS, qmail-ldap.h, check.c and
+       see also 5.2.
+       Program delivery is done in addition to local (maildir/mbox) delivery.
+       Program delivery can be disabled without having to remove the
+       entries. See deliveryMode for more information on both.
+       A valid home-directory is needed so either LDAP_MAILSTORE or
+       LDAP_HOMEDIR needs to be defined.
+
+LDAP_MODE (default: "deliveryMode")
+
+ multi field entries of these keywords
+ - (no entry): default delivery, put message into maildir/mbox (localdelivery),
+   plus forward and program delivery if specified.
+ - noforward: do not forward (ignores forwarding entries in ldap and .qmail)
+ - nolocal: do not put message into maildir/mbox (ignores also .qmail)
+ - noprogram: do not do program deliveries (ignores deliveryprogrampath, .qmail)
+ - reply: send an auto_reply mail with text from mailReplyText
+ Default: no entry -> default
+ Example: noforward
+          noprogram
+ Note: The behaviour changed compared with previous qmail-ldap versions
+       (20030801 and earlier)!
+       Setting a mailForwardingAddress no longer disables local delivery.
+       This is the most important change.
+
+       Normal is no longer a real mode. It is just a placeholder for the
+       default behaviour.
+       Local delivery is now always done, except when explicitly disabled
+       with nolocal.
+
+       Noforward and noprogram disable forwardings and program deliveries
+       even if mailForwardingsAddress or deliveryProgramPath attributes
+       exist. This way you can keep programs and forwards but turn them
+       off if you don't need them, instead of removing their attributes.
+
+       If no mode to the contrary set, forwards, program deliveries, local
+       deliveries are all done if existent. Reply is not automatic and has
+       to be enabled explicitly.
+
+
+LDAP_REPLYTEXT (default: "mailReplyText")
+
+ A reply text for every incoming message (multiline)
+ Example: I'm on vacation until next monday
+ Example2: multiline base64
+   SGkgcW1haWwtbGRhcCBmYW5zLAoKaWYgSSBjb3VsZCBJIHdvdWxkIGJlIGlu
+   IHRoZSBtb3VudGFpbnMgc2tpaW5nIGJ1dCBJJ20gYXQgaG9tZQp3cml0aW5n
+   IHRoaXMgbWVzc2FnZSBmb3IgdGhlIFFMREFQSU5TVEFMTCBmaWxlLgpUbyBi
+   ZSBob25lc3QsIHRoZXJlIGlzIG5vdCBlbm91Z2ggc25vdyBhcm91bmQgdG8g
+   ZW5qb3kgc2tpaW5nLgoKdGhhbmtzIGZvciByZWFkaW5nIHRoZSBRTERBUElO
+   U1RBTEwgZmlsZQoKLS0KOndxIENsYXVkaW8K
+ Note: used only if deliveryMode is set to reply.
+       To use multiline text in ldap it has to be base64 in the ldif.
+       GUI tools like GQ are doing this correct, ldapadd can handle base64
+       inputs or a path to a file containing the reply text (man ldapadd).
+ Note2: It is now possible to add a header section to the reply.
+       If the replytext starts with a %HEADER% line all lines following until
+       the next empty line are treated as header. The fields From:, Subject:,
+       the content type headers and most X- headers can be set. To:, X-Mailer:
+       and Precedence: are ignored and set by qmail-reply. If %SUBJECT%
+       is used in the Subject field it is expanded with the Subject of the sent
+       mail. This expansion will only work for the first line of a multiline
+       Subject header.
+
+LDAP_DOTMODE (default: "qmailDotMode")
+
+ The default interpretation of .qmail files
+ Values: both, dotonly, ldaponly, ldapwithprog, none (just Maildir/box delivery)
+ Default: set by file ~control/ldapdefaultdotmode
+ Note: Works only for deliveries based on LDAP lookups,
+       overrides ~control/ldapdefaultdotmode.
+ 
+
+LDAP_MAILHOST (default: "mailHost")
+
+ On which qmail server the messagestore of this user is located
+ Example: qmail3.nrg4u.com
+ Note: Must be the same as the ~control/me hostname on the homeserver 
+       of the user.
+
+
+LDAP_ISACTIVE (default: "accountStatus")
+
+ The status of a user account.
+ Values: active (no restrictions),
+         noaccess (only mail delivery but no pop/imap access),
+         disabled (bounce incoming messages)
+         deleted (bounce incoming messages and mark for deletion,
+                  see LDAP_PURGE)
+ Default: no accountStatus is equal to active.
+
+
+LDAP_PURGE (default: "qmailAccountPurge")
+
+ If accountStatus set to 'deleted', the earliest date when the mailMessageStore
+ including all remaining content will be deleted from the filesystem.
+ Values: date and time in seconds since Jan. 1, 1970 (the epoch)
+ Default: not set
+ Note: This deletion has to be done by an external helper program, for example
+       periodically run from cron. A sample script is included under the name
+       qmailAccountPurge.sh. Handle automatic deletions with care!
+
+
+LDAP_QMAILUSER (default: "qmailUser")
+ NO LONGER USED, REMOVE IT SOMEWHEN FROM YOUR DATABASE
+ Replaced by LDAP_UID
+
+================================================================================
+
+EXAMPLE QLDAP LDIF FILE:
+
+dn: cn=Andre Oppermann, o=Internet Pipeline, c=CH
+cn: Andre Oppermann
+sn: Oppermann
+objectClass: top
+objectClass: person
+objectClass: inetOrgPerson
+objectClass: qmailUser
+mail: opi@opi.flirtbox.ch
+mailAlternateAddress: andre@opi.flirtbox.ch
+mailHost: opi.flirtbox.ch
+mailMessageStore: /usr/home/opi/Maildir/
+mailForwardingAddress: opi@nrg4u.com
+deliveryProgramPath: /usr/home/opi/bin/smsinformer -q
+deliveryMode: noprogram
+mailQuotaSize: 1000000
+mailQuotaCount: 1000
+qmailUID: 1001
+qmailGID: 1001
+uid: opi
+userPassword: {SMD5}b28a87511da157f147ed4766b0474a8a
+accountStatus: active
+
+================================================================================
+
+EXAMPLE SLAPD.CONF FILE:
+
+#######################################################################
+# ldbm database definitions
+#######################################################################
+
+database        ldbm
+suffix          "o=Internet Pipeline, c=CH"
+directory       /var/qmail/users
+rootdn          "cn=root, o=Internet Pipeline, c=CH"
+rootpw          secret
+index           objectclass,mail,mailAlternateAddress,uid  eq,sub
+index		accountStatus,mailHost,deliveryMode  eq
+index           default sub
+
+================================================================================
+
+FOR OpenLDAP 2.x DO THIS:
+
+Copy qmail.schema to your OpenLDAP installation location and add this
+to your slapd.conf:
+
+ include /path/to/your/OpenLDAP/qmail.schema
+
+================================================================================
+
+MAILINGLIST, BUGS & PROBLEMS
+
+There is a qmail-ldap specific mailinglist at qmail-ldap@qmail-ldap.org.
+To subscribe just write a mail to qmail-ldap-subscribe@qmail-ldap.org.
+
+The qmail-ldap mailinglist archive can be found at
+http://www.suares.com/qmail-ldap/archive
+
+There is also a life with qmail-ldap homepage at:
+http://www.lifewithqmail.org/ldap
+
+If you have a problem with the patch or there seems to be a bug in the code
+please add some output of qmail-ldap with LOGLEVEL set to something higher
+then 2 (255 is a good setting to see all possible problems).
+It is impossible to know where the problem is when somebody writes a mail like:
+I have a problem with the patch. No mail gets send to the user in the ldap db.
+
+Normaly you get also a better response if you specify your problem in detail.
+It seems that often a "RTFM" is enough, but when you have read until here you 
+are probably not such a candidate.
+
+END :-)
+

@@ -1,16 +1,21 @@
+/* Public domain. */
+
 #include "cdb.h"
 
-uint32 cdb_hash(buf,len)
-unsigned char *buf;
-unsigned int len;
+uint32 cdb_hashadd(uint32 h,unsigned char c)
+{
+  h += (h << 5);
+  return h ^ c;
+}
+
+uint32 cdb_hash(const char *buf,unsigned int len)
 {
   uint32 h;
 
-  h = 5381;
+  h = CDB_HASHSTART;
   while (len) {
+    h = cdb_hashadd(h,*buf++);
     --len;
-    h += (h << 5);
-    h ^= (uint32) *buf++;
   }
   return h;
 }

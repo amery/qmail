@@ -2,10 +2,10 @@
 #include "fmt.h"
 #include "myctime.h"
 
-static char *daytab[7] = {
+static const char *daytab[7] = {
 "Sun","Mon","Tue","Wed","Thu","Fri","Sat"
 };
-static char *montab[12] = {
+static const char *montab[12] = {
 "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"
 };
 

@@ -28,7 +28,7 @@ int sig;
 #endif
 }
 
-void sig_blocknone()
+void sig_blocknone(void)
 {
 #ifdef HASSIGPROCMASK
   sigset_t ss;

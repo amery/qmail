@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "fork.h"
 #include "strerr.h"
 #include "wait.h"
@@ -6,7 +7,7 @@
 
 #define FATAL "except: fatal: "
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
@@ -32,6 +33,7 @@ char **argv;
   switch(wait_exitcode(wstat)) {
     case 0: _exit(100);
     case 111: strerr_die2x(111,FATAL,"temporary child error");
-    default: _exit(0);
+    default: break;
   }
+  return 0;
 }

@@ -3,7 +3,7 @@
 
 int stralloc_copyb(sa,s,n)
 stralloc *sa;
-char *s;
+const char *s;
 unsigned int n;
 {
   if (!stralloc_ready(sa,n + 1)) return 0;

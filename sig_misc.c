@@ -1,7 +1,7 @@
 #include <signal.h>
 #include "sig.h"
 
-void sig_miscignore()
+void sig_miscignore(void)
 {
   sig_catch(SIGVTALRM,SIG_IGN);
   sig_catch(SIGPROF,SIG_IGN);

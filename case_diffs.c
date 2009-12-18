@@ -1,8 +1,8 @@
 #include "case.h"
 
 int case_diffs(s,t)
-register char *s;
-register char *t;
+register const char *s;
+register const char *t;
 {
   register unsigned char x;
   register unsigned char y;

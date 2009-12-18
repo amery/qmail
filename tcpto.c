@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "tcpto.h"
 #include "open.h"
 #include "lock.h"
@@ -77,6 +78,7 @@ void tcpto_err(ip,flagerr) struct ip_address *ip; int flagerr;
  int firstpos;
  datetime_sec lastwhen;
 
+ firstwhen = 0;
  if (!flagerr)
    if (!flagwasthere)
      return; /* could have been added, but not worth the effort to check */

@@ -1,0 +1,29 @@
+ 1. qmail-smtpd accepts connection
+
+    Is relayclient set?
+      Yes -> accept it anyway.
+      No  -> check if recipient domain is listed in rcpthosts else
+             deny
+
+    Does sender's domain have a valid MX or A record?
+      Yes -> accept for data
+      No  -> deny
+
+    Now the message gets queued.
+
+ 2. qmail-send takes a look at it
+
+    Is the recipients domain in virtualhosts or locals (doesn't matter
+    with qmail-ldap)?
+      Yes -> feed it to qmail-lspawn for local delivery
+      No  -> feed it to qmail-rspawn for remote delivery (relaying as
+             usual)
+
+ 3. qmail-lspawn gets it for local delivery
+
+    Is the recipients full email address found in the LDAP directory?
+      Yes -> check if all needed attributes are present
+               Yes -> deliver it to the maildir
+               No  -> bounce
+      No  -> try a standard qmail (UNIX user or ~users/assign) delivery
+

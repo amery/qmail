@@ -9,10 +9,11 @@ static struct token822 comma = { TOKEN822_COMMA };
 void token822_reverse(ta)
 token822_alloc *ta;
 {
- int i;
- int n;
+ unsigned int i;
+ unsigned int n;
  struct token822 temp;
 
+ if (ta->len == 0) return;
  n = ta->len - 1;
  for (i = 0;i + i < n;++i)
   {
@@ -65,7 +66,7 @@ char ch;
 static void atomcheck(t)
 struct token822 *t;
 {
- int i;
+ unsigned int i;
  char ch;
  for (i = 0;i < t->slen;++i)
   {
@@ -84,10 +85,10 @@ token822_alloc *ta;
 unsigned int linelen;
 {
  struct token822 *t;
- int len;
+ unsigned int len;
  int ch;
- int i;
- int j;
+ unsigned int i;
+ unsigned int j;
  int lasttype;
  int newtype;
  char *s;
@@ -145,7 +146,7 @@ unsigned int linelen;
        *s++ = ',';
 #define NSUW \
  s[0] = '\n'; s[1] = ' '; \
- if (linee && (!linelen || (s - lineb <= linelen))) \
+ if (linee && (!linelen || ((unsigned long)(s - lineb) <= linelen))) \
   { while (linee < s) { linee[0] = linee[2]; ++linee; } linee -= 2; } \
  else { if (linee) lineb = linee + 1; linee = s; s += 2; }
        NSUW
@@ -184,9 +185,9 @@ stralloc *sa;
 token822_alloc *ta;
 {
  struct token822 *t;
- int len;
- int i;
- int j;
+ unsigned int len;
+ unsigned int i;
+ unsigned int j;
  char *s;
 
  len = 0;
@@ -240,12 +241,12 @@ token822_alloc *ta;
 stralloc *sa;
 stralloc *buf;
 {
- int i;
- int salen;
- int level;
+ unsigned int i;
+ unsigned int salen;
+ unsigned int level;
  struct token822 *t;
- int numtoks;
- int numchars;
+ unsigned int numtoks;
+ unsigned int numchars;
  char *cbuf;
 
  salen = sa->len;
@@ -403,7 +404,7 @@ token822_alloc *taout;
 token822_alloc *taaddr;
 int (*callback)();
 {
- int i;
+ unsigned int i;
 
  if (callback(taaddr) != 1)
    return 0;

@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "fork.h"
 #include "strerr.h"
 #include "error.h"
@@ -7,7 +8,7 @@
 
 #define FATAL "bouncesaying: fatal: "
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
@@ -38,4 +39,6 @@ char **argv;
   }
 
   strerr_die1x(100,argv[1]);
+  /* NOTREACHED */
+  return 100;
 }

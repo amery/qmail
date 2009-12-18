@@ -1,0 +1,5 @@
+#!/bin/sh
+# public domain
+#
+/bin/mkdir -m 700 -p $1
+#EOF

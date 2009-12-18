@@ -1,0 +1,9 @@
+#
+# POP3 Server rules.
+# Normaly you allow from everyware and the only useful env vars are
+# NOPBS, LOGLEVEL and POP3_LOGLEVEL.
+#
+# disable pop-befor-smtp on the loopback
+127.0.0.1:allow,NOPBS=""
+# default allow
+:allow

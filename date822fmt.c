@@ -2,7 +2,7 @@
 #include "fmt.h"
 #include "date822fmt.h"
 
-static char *montab[12] = {
+static const char *montab[12] = {
 "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"
 };
 

@@ -12,11 +12,11 @@ char temp[IPFMT];
 stralloc sa = {0};
 ipalloc ia = {0};
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
- int j;
+ unsigned int j;
 
  if (!argv[1]) _exit(100);
 
@@ -30,5 +30,5 @@ char **argv;
    substdio_put(subfdout,temp,ip_fmt(temp,&ia.ix[j].ip));
    substdio_putsflush(subfdout,"\n");
   }
- _exit(0);
+ return 0;
 }

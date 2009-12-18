@@ -1,0 +1,45 @@
+QMAIL-LDAP by Andre Oppermann <opi@nrg4u.com>,
+Claudio Jeker <jeker@n-r-g.com> and Boris Lutz <lutz@n-r-g.com>
+(c) 2000-2004 Internet Business Solutions AG
+
+RELEASE: $Date: 2004/08/03 20:27:44 $ ($Revision: 1.36 $)
+
+This is the TODO FILE, so the QLDAPINSTALL file gets a bit cleaner.
+This file is NOT structured!!
+
+NEWS:
+
+ see QLDAPNEWS
+
+TODO:
+
+ongoing - Debugging and testing, testing, testing
+done    - The big qmail-ldap picture
+ongoing - full code review by a third person
+planned - make it possible to have locals and rcpthosts in ldap
+          and perhaps also the rules for the tcpserver (certs?)
+          some people refer to this as ldap-control
+
+PS: planned means we see the use of the idea but there are a lot more
+    important things that need to be done first.
+
+ALSO ON THE LIST: (priority list)
+- update qmail-ldaplookup (mainly ldap login, passwd check and group handling)
+- cleanup the debug code, unify the debug levels
+- cleanup failures (hard vs. temporary)
+- use pbstools for enhanced tarpit idea
+- make full example for qmailaccountpurge.sh
+- docu cleanup
+- address rewriting (envelope only)
+
+older stuff still on the list:
+- add more and clearer documentation.
+- benchmarking the code
+- better TLS support (better written??) (tls for pop???)
+- 64bit counters for quota handling code.
+
+status unclear:
+- force to alias if only mail and mailforwardingaddress is set (no uid). (done)
+- test what happens if only uid and mail is defiend in ldap or similar uncommon
+  cases (seems to be no problem, or?)
+

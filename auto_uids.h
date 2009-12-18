@@ -1,16 +1,16 @@
 #ifndef AUTO_UIDS_H
 #define AUTO_UIDS_H
 
-extern int auto_uida;
-extern int auto_uidd;
-extern int auto_uidl;
-extern int auto_uido;
-extern int auto_uidp;
-extern int auto_uidq;
-extern int auto_uidr;
-extern int auto_uids;
+extern unsigned int auto_uida;
+extern unsigned int auto_uidd;
+extern unsigned int auto_uidl;
+extern unsigned int auto_uido;
+extern unsigned int auto_uidp;
+extern unsigned int auto_uidq;
+extern unsigned int auto_uidr;
+extern unsigned int auto_uids;
 
-extern int auto_gidn;
-extern int auto_gidq;
+extern unsigned int auto_gidn;
+extern unsigned int auto_gidq;
 
 #endif

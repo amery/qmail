@@ -4,18 +4,22 @@
 struct strerr
  {
   struct strerr *who;
-  char *x;
-  char *y;
-  char *z;
+  const char *x;
+  const char *y;
+  const char *z;
  }
 ;
 
 extern struct strerr strerr_sys;
-extern void strerr_sysinit();
+extern void strerr_sysinit(void);
 
+/* XXX not available in qmail-1.03
 extern char *strerr();
-extern void strerr_warn();
-extern void strerr_die();
+*/
+extern void strerr_warn(const char *, const char *, const char *,
+    const char *, const char *, const char *, struct strerr *);
+extern void strerr_die(int, const char *, const char *, const char *,
+    const char *, const char *, const char *, struct strerr *);
 
 #define STRERR(r,se,a) \
 { se.who = 0; se.x = a; se.y = 0; se.z = 0; return r; }

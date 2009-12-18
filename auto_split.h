@@ -1,6 +1,6 @@
 #ifndef AUTO_SPLIT_H
 #define AUTO_SPLIT_H
 
-extern int auto_split;
+extern unsigned int auto_split;
 
 #endif

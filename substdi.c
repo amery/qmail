@@ -6,7 +6,7 @@ static int oneread(op,fd,buf,len)
 register int (*op)();
 register int fd;
 register char *buf;
-register int len;
+register unsigned int len;
 {
   register int r;
 
@@ -20,9 +20,9 @@ register int len;
 static int getthis(s,buf,len)
 register substdio *s;
 register char *buf;
-register int len;
+register unsigned int len;
 {
-  register int r;
+  register unsigned int r;
   register int q;
  
   r = s->p;
@@ -53,12 +53,13 @@ register substdio *s;
 int substdio_bget(s,buf,len)
 register substdio *s;
 register char *buf;
-register int len;
+register unsigned int len;
 {
-  register int r;
+  unsigned int u;
+  int r;
  
   if (s->p > 0) return getthis(s,buf,len);
-  r = s->n; if (r <= len) return oneread(s->op,s->fd,buf,r);
+  u = s->n; if (u <= len) return oneread(s->op,s->fd,buf,u);
   r = substdio_feed(s); if (r <= 0) return r;
   return getthis(s,buf,len);
 }
@@ -66,7 +67,7 @@ register int len;
 int substdio_get(s,buf,len)
 register substdio *s;
 register char *buf;
-register int len;
+register unsigned int len;
 {
   register int r;
  
@@ -84,7 +85,7 @@ register substdio *s;
 
 void substdio_seek(s,len)
 register substdio *s;
-register int len;
+register unsigned int len;
 {
   s->n += len;
   s->p -= len;

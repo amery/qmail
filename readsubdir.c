@@ -6,7 +6,7 @@
 
 void readsubdir_init(rs,name,pause)
 readsubdir *rs;
-char *name;
+const char *name;
 void (*pause)();
 {
  rs->name = name;
@@ -31,7 +31,7 @@ unsigned long *id;
    len = 0;
    len += fmt_str(namepos + len,rs->name);
    namepos[len++] = '/';
-   len += fmt_ulong(namepos + len,(unsigned long) rs->pos);
+   len += fmt_uint(namepos + len, rs->pos);
    namepos[len] = 0;
    while (!(rs->dir = opendir(namepos))) rs->pause(namepos);
    rs->pos++;

@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include "stralloc.h"
 #include "substdio.h"
 #include "subfd.h"
@@ -20,9 +21,9 @@ readsubdir rs;
 
 void die(n) int n; { substdio_flush(subfdout); _exit(n); }
 
-void warn(s1,s2) char *s1; char *s2;
+void warn(s1,s2) const char *s1; const char *s2;
 {
- char *x;
+ const char *x;
  x = error_str(errno);
  substdio_puts(subfdout,s1);
  substdio_puts(subfdout,s2);
@@ -105,7 +106,7 @@ void putstats()
 
 stralloc line = {0};
 
-void main()
+int main()
 {
  int channel;
  int match;
@@ -118,7 +119,7 @@ void main()
  if (chdir("queue") == -1) die_chdir();
  readsubdir_init(&rs,"info",die_opendir);
 
- while (x = readsubdir_next(&rs,&id))
+ while ((x = readsubdir_next(&rs,&id)))
    if (x > 0)
     {
      fmtqfn(fnmess,"mess/",id,1);
@@ -133,7 +134,7 @@ void main()
 
      fd = open_read(fninfo);
      if (fd == -1) { err(id); continue; }
-     substdio_fdbuf(&ss,read,fd,inbuf,sizeof(inbuf));
+     substdio_fdbuf(&ss,subread,fd,inbuf,sizeof(inbuf));
      if (getln(&ss,&sender,&match,0) == -1) die_nomem();
      if (fstat(fd,&st) == -1) { close(fd); err(id); continue; }
      close(fd);
@@ -172,4 +173,5 @@ void main()
     }
 
  die(0);
+ return 0;
 }

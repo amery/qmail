@@ -1,9 +1,9 @@
 #ifndef HFIELD_H
 #define HFIELD_H
 
-extern unsigned int hfield_skipname();
-extern int hfield_known();
-extern int hfield_valid();
+extern unsigned int hfield_skipname(char *, unsigned int);
+extern int hfield_known(char *, unsigned int);
+extern int hfield_valid(char *, unsigned int);
 
 #define H_SENDER 1
 #define H_FROM 2

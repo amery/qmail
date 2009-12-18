@@ -1,8 +1,10 @@
+#include <unistd.h>
+#include "readwrite.h"
 #include "ndelay.h"
 #include "open.h"
 #include "triggerpull.h"
 
-void triggerpull()
+void triggerpull(void)
 {
  int fd;
 

@@ -11,6 +11,7 @@ substdio *ss;
 struct commands *c;
 {
   int i;
+  unsigned int n;
   char *arg;
 
   for (;;) {
@@ -28,13 +29,13 @@ struct commands *c;
 
     cmd.s[cmd.len] = 0;
 
-    i = str_chr(cmd.s,' ');
-    arg = cmd.s + i;
+    n = str_chr(cmd.s,' ');
+    arg = cmd.s + n;
     while (*arg == ' ') ++arg;
-    cmd.s[i] = 0;
+    cmd.s[n] = 0;
 
-    for (i = 0;c[i].text;++i) if (case_equals(c[i].text,cmd.s)) break;
-    c[i].fun(arg);
-    if (c[i].flush) c[i].flush();
+    for (n = 0;c[n].text;++n) if (case_equals(c[n].text,cmd.s)) break;
+    c[n].fun(arg);
+    if (c[n].flush) c[n].flush();
   }
 }

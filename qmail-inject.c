@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "sig.h"
 #include "substdio.h"
 #include "stralloc.h"
@@ -35,10 +36,10 @@ int flagnamecomment = 0;
 int flaghackmess = 0;
 int flaghackrecip = 0;
 char *mailhost;
-char *mailuser;
+const char *mailuser;
 int mailusertokentype;
 char *mailrhost;
-char *mailruser;
+const char *mailruser;
 
 stralloc control_idhost = {0};
 stralloc control_defaultdomain = {0};
@@ -53,9 +54,9 @@ int flagrh;
 int flagqueue;
 struct qmail qqt;
 
-void put(s,len) char *s; int len;
+void put(const char *s, unsigned int len)
 { if (flagqueue) qmail_put(&qqt,s,len); else substdio_put(subfdout,s,len); }
-void puts(s) char *s; { put(s,str_len(s)); }
+void putstr(const char *s) { put(s,str_len(s)); }
 
 void perm() { _exit(100); }
 void temp() { _exit(111); }
@@ -90,13 +91,13 @@ int flagresent;
 
 void exitnicely()
 {
- char *qqx;
+ const char *qqx;
 
  if (!flagqueue) substdio_flush(subfdout);
 
  if (flagqueue)
   {
-   int i;
+   unsigned int i;
 
    if (!stralloc_0(&sender)) die_nomem();
    qmail_from(&qqt,sender.s);
@@ -106,7 +107,7 @@ void exitnicely()
      if (!stralloc_0(&reciplist.sa[i])) die_nomem();
      qmail_to(&qqt,reciplist.sa[i].s);
     }
-   if (flagrh)
+   if (flagrh) {
      if (flagresent)
        for (i = 0;i < hrrlist.len;++i)
 	{
@@ -119,9 +120,9 @@ void exitnicely()
          if (!stralloc_0(&hrlist.sa[i])) die_nomem();
 	 qmail_to(&qqt,hrlist.sa[i].s);
 	}
-
+   }
    qqx = qmail_close(&qqt);
-   if (*qqx)
+   if (*qqx) {
      if (*qqx == 'D') {
        substdio_puts(subfderr,"qmail-inject: fatal: ");
        substdio_puts(subfderr,qqx + 1);
@@ -136,6 +137,7 @@ void exitnicely()
        substdio_flush(subfderr);
        temp();
      }
+   }
   }
 
  _exit(0);
@@ -152,7 +154,7 @@ stralloc *h;
 
 void savedh_print()
 {
- int i;
+ unsigned int i;
 
  for (i = 0;i < savedh.len;++i)
    put(savedh.sa[i].s,savedh.sa[i].len);
@@ -177,7 +179,7 @@ token822_alloc *addr;
 void rwextraat(addr)
 token822_alloc *addr;
 {
- int i;
+ unsigned int i;
  if (addr->t[0].type == TOKEN822_AT)
   {
    --addr->len;
@@ -189,7 +191,7 @@ token822_alloc *addr;
 void rwextradot(addr)
 token822_alloc *addr;
 {
- int i;
+ unsigned int i;
  if (addr->t[0].type == TOKEN822_DOT)
   {
    --addr->len;
@@ -201,17 +203,17 @@ token822_alloc *addr;
 void rwnoat(addr)
 token822_alloc *addr;
 {
- int i;
- int shift;
+ unsigned int i;
+ unsigned int shift;
 
  for (i = 0;i < addr->len;++i)
    if (addr->t[i].type == TOKEN822_AT)
      return;
  shift = defaulthost.len;
  if (!token822_readyplus(addr,shift)) die_nomem();
- for (i = addr->len - 1;i >= 0;--i)
-   addr->t[i + shift] = addr->t[i];
  addr->len += shift;
+ for (i = addr->len - 1;i >= shift;--i)
+   addr->t[i] = addr->t[i - shift];
  for (i = 0;i < shift;++i)
    addr->t[i] = defaulthost.t[shift - 1 - i];
 }
@@ -219,8 +221,8 @@ token822_alloc *addr;
 void rwnodot(addr)
 token822_alloc *addr;
 {
- int i;
- int shift;
+ unsigned int i;
+ unsigned int shift;
  for (i = 0;i < addr->len;++i)
   {
    if (addr->t[i].type == TOKEN822_DOT)
@@ -237,9 +239,9 @@ token822_alloc *addr;
   }
  shift = defaultdomain.len;
  if (!token822_readyplus(addr,shift)) die_nomem();
- for (i = addr->len - 1;i >= 0;--i)
-   addr->t[i + shift] = addr->t[i];
  addr->len += shift;
+ for (i = addr->len - 1;i >= shift;--i)
+   addr->t[i] = addr->t[i - shift];
  for (i = 0;i < shift;++i)
    addr->t[i] = defaultdomain.t[shift - 1 - i];
 }
@@ -247,8 +249,8 @@ token822_alloc *addr;
 void rwplus(addr)
 token822_alloc *addr;
 {
- int i;
- int shift;
+ unsigned int i;
+ unsigned int shift;
 
  if (addr->t[0].type != TOKEN822_ATOM) return;
  if (!addr->t[0].slen) return;
@@ -258,9 +260,9 @@ token822_alloc *addr;
 
  shift = plusdomain.len;
  if (!token822_readyplus(addr,shift)) die_nomem();
- for (i = addr->len - 1;i >= 0;--i)
-   addr->t[i + shift] = addr->t[i];
  addr->len += shift;
+ for (i = addr->len - 1;i >= shift;--i)
+   addr->t[i] = addr->t[i - shift];
  for (i = 0;i < shift;++i)
    addr->t[i] = plusdomain.t[shift - 1 - i];
 }
@@ -536,7 +538,7 @@ void mft_init()
 
 void finishmft()
 {
-  int i;
+  unsigned int i;
   static stralloc sa = {0};
   static stralloc sa2 = {0};
 
@@ -549,16 +551,16 @@ void finishmft()
 
   if (i == tocclist.len) return;
 
-  puts("Mail-Followup-To: ");
+  putstr("Mail-Followup-To: ");
   i = tocclist.len;
   while (i--) {
     if (!stralloc_copy(&sa,&tocclist.sa[i])) die_nomem();
     if (!stralloc_0(&sa)) die_nomem();
     if (!quote2(&sa2,sa.s)) die_nomem();
     put(sa2.s,sa2.len);
-    if (i) puts(",\n  ");
+    if (i) putstr(",\n  ");
   }
-  puts("\n");
+  putstr("\n");
 }
 
 void finishheader()
@@ -580,9 +582,9 @@ void finishheader()
    if (!stralloc_0(&sa)) die_nomem();
    if (!quote2(&sa2,sa.s)) die_nomem();
 
-   puts("Return-Path: <");
+   putstr("Return-Path: <");
    put(sa2.s,sa2.len);
-   puts(">\n");
+   putstr(">\n");
   }
 
  /* could check at this point whether there are any recipients */
@@ -594,23 +596,23 @@ void finishheader()
    if (!htypeseen[H_R_DATE])
     {
      if (!newfield_datemake(starttime)) die_nomem();
-     puts("Resent-");
+     putstr("Resent-");
      put(newfield_date.s,newfield_date.len);
     }
    if (!htypeseen[H_R_MESSAGEID])
     {
      if (!newfield_msgidmake(control_idhost.s,control_idhost.len,starttime)) die_nomem();
-     puts("Resent-");
+     putstr("Resent-");
      put(newfield_msgid.s,newfield_msgid.len);
     }
    if (!htypeseen[H_R_FROM])
     {
      defaultfrommake();
-     puts("Resent-");
+     putstr("Resent-");
      put(defaultfrom.s,defaultfrom.len);
     }
    if (!htypeseen[H_R_TO] && !htypeseen[H_R_CC])
-     puts("Resent-Cc: recipient list not shown: ;\n");
+     putstr("Resent-Cc: recipient list not shown: ;\n");
   }
  else
   {
@@ -630,7 +632,7 @@ void finishheader()
      put(defaultfrom.s,defaultfrom.len);
     }
    if (!htypeseen[H_TO] && !htypeseen[H_CC])
-     puts("Cc: recipient list not shown: ;\n");
+     putstr("Cc: recipient list not shown: ;\n");
    finishmft();
   }
 
@@ -682,11 +684,11 @@ void getcontrols()
 #define RECIP_HEADER 3
 #define RECIP_AH 4
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
- int i;
+ unsigned int i;
  int opt;
  int recipstrategy;
 
@@ -770,4 +772,6 @@ char **argv;
  if (headerbody(subfdin,doheaderfield,finishheader,dobody) == -1)
    die_read();
  exitnicely();
+ /* NOTREACHED */
+ return 0;
 }

@@ -1,0 +1,71 @@
+Frederik Vermeulen <jos-tls@kotnet.org> 20000112
+http://www.esat.kuleuven.ac.be/~vermeule/qmail/tls.patch
+
+This patch implements RFC2487 in qmail. This means you can 
+get SSL or TLS encrypted and authenticated SMTP between 
+the MTAs and between MTA and an MUA like Netscape4.5. 
+The code is considered experimental.
+
+Usage: - install OpenSSL-0.9.4 http://www.openssl.org/
+       - apply patch to qmail-1.03 http://www.qmail.org/ 
+         Makefile and conf-cc were patched for appropriate
+         linking. Apart from that, the patches to qmail-remote.c
+         and qmail-smtpd.c can be applied separately.
+       - provide a certificate in /var/qmail/control/cert.pem.
+         "make cert" makes a self-signed certificate.
+         "make cert-req" makes a certificate request.
+       - replace qmail-smtpd and/or qmail-remote binary
+       - verify operation (header information should show
+         something like
+         "Received [..] with DES-CBC3-SHA encrypted SMTP;")
+         If you don't have a server to test with, you can test
+         by sending mail to ping@linux.student.kuleuven.ac.be,
+         which will bounce your mail.
+
+Optional: - when TLSDEBUG is defined, some extra SSL info will be logged
+          - when a 512 RSA key is provided in /var/qmail/control/rsa512.pem,
+            this key will be used instead of on-the-fly generation by
+       	    qmail-smtpd. Daily replacement can be done by crontab:
+       	    01 01 * * * /usr/local/ssl/bin/openssl genrsa \
+       	     -out /var/qmail/control/rsa512.new 512 > /dev/null 2>&1;\
+       	     chmod 600 /var/qmail/control/rsa512.new; chown qmaild.qmail \
+       	     /var/qmail/control/rsa512.new; /bin/mv -f \
+       	     /var/qmail/control/rsa512.new /var/qmail/control/rsa512.pem
+          - server authentication:
+	    qmail-remote requires authentication from servers for which
+	    /var/qmail/control/tlshosts/host.dom.ain.pem exists.
+	    The .pem file contains the validating CA certificates
+	    (or self-signed server certificate with openssl-0.9.5).
+	    CommonName has to match.
+            WARNING: this option may cause mail to be delayed, bounced,
+	    doublebounced, and lost.
+          - client authentication:
+	    when relay rules would reject an incoming mail, 
+	    qmail-smtpd can allow the mail based on a presented cert.
+	    Certs are verified against a CA list in 
+	    /var/qmail/control/clientca.pem (eg. http://www.modssl.org/
+	    source/cvs/exp/mod_ssl/pkg.mod_ssl/pkg.sslcfg/ca-bundle.crt)
+            and the cert email-address has to match a line in
+	    /var/qmail/control/tlsclients. This email-address is logged
+	    in the headers.
+
+Copyright: Same terms as qmail
+           Links with OpenSSL
+           Inspiration and code from examples in SSLeay (E. Young
+           <eay@cryptsoft.com> and T. Hudson <tjh@cryptsoft.com>),
+           stunnel (M. Trojnara <mtrojnar@ddc.daewoo.com.pl>),
+	   Postfix/TLS (L. Jaenicke <Lutz.Jaenicke@aet.tu-cottbus.de>),
+	   and modssl (R. Engelschall <rse@engelschall.com>).
+           Debug code from Jean-Philippe Donnio <jpdonnio@cpod.fr>
+           Openssl usage consulting from Bodo M"oller <bmoeller@acm.org>
+
+
+Interoperability: - Netscape 4.5 and higher
+                  - Microsoft Outlook 5
+		  - Microsoft Exchange Internet Mail Server 5.5.2448.0
+                  - Postfix/TLS
+                    http://www.aet.TU-Cottbus.DE/personen/jaenicke/pfixtls/
+                  - Sendmail-TLS http://opensource.3gi.com/sendmail-tls/
+
+Patches: mailto:<jos-tls@kotnet.org>
+

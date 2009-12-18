@@ -5,7 +5,7 @@ register substdio *s;
 register int (*op)();
 register int fd;
 register char *buf;
-register int len;
+register unsigned int len;
 {
   s->x = buf;
   s->fd = fd;

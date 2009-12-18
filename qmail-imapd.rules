@@ -1,0 +1,6 @@
+#
+# IMAP Server rules.
+# Normaly you allow from everyware and the only useful env vars are probably
+# IMAPCAPAPBILITY, NOPBS and LOGLEVEL
+#
+:allow,IMAP_CAPABILITY="IMAP4rev1 CHILDREN NAMESPACE THREAD=ORDEREDSUBJECT THREAD=REFERENCES SORT QUOTA"

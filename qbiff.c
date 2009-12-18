@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <utmp.h>
 #ifndef UTMP_FILE
 #ifdef _PATH_UTMP
@@ -33,7 +34,7 @@ stralloc woof = {0};
 stralloc tofrom = {0};
 stralloc text = {0};
 
-void doit(s,n) char *s; int n;
+void doit(s,n) char *s; unsigned int n;
 {
  if (!stralloc_catb(&text,s,n)) _exit(0);
  if (text.len > 78) text.len = 78;
@@ -41,7 +42,7 @@ void doit(s,n) char *s; int n;
 void dobody(h) stralloc *h; { doit(h->s,h->len); }
 void doheader(h) stralloc *h;
 {
- int i;
+ unsigned int i;
  if (hfield_known(h->s,h->len) == H_SUBJECT)
   {
    i = hfield_skipname(h->s,h->len);
@@ -50,13 +51,13 @@ void doheader(h) stralloc *h;
 }
 void finishheader() { ; }
 
-void main()
+int main()
 {
  char *user;
  char *sender;
  char *userext;
  struct stat st;
- int i;
+ unsigned int i;
 
  if (chdir("/dev") == -1) _exit(0);
 
@@ -90,9 +91,9 @@ void main()
 
  fdutmp = open_read(UTMP_FILE);
  if (fdutmp == -1) _exit(0);
- substdio_fdbuf(&ssutmp,read,fdutmp,bufutmp,sizeof(bufutmp));
+ substdio_fdbuf(&ssutmp,subread,fdutmp,bufutmp,sizeof(bufutmp));
 
- while (substdio_get(&ssutmp,&ut,sizeof(ut)) == sizeof(ut))
+ while (substdio_get(&ssutmp,(char *)&ut,sizeof(ut)) == sizeof(ut))
    if (!str_diffn(ut.ut_name,user,sizeof(ut.ut_name)))
     {
      byte_copy(line,sizeof(ut.ut_line),ut.ut_line);
@@ -105,9 +106,9 @@ void main()
      if (fstat(fdtty,&st) == -1) { close(fdtty); continue; }
      if (!(st.st_mode & 0100)) { close(fdtty); continue; }
      if (st.st_uid != getuid()) { close(fdtty); continue; }
-     substdio_fdbuf(&sstty,write,fdtty,buftty,sizeof(buftty));
+     substdio_fdbuf(&sstty,subwrite,fdtty,buftty,sizeof(buftty));
      substdio_putflush(&sstty,woof.s,woof.len);
      close(fdtty);
     }
- _exit(0);
+ return 0;
 }

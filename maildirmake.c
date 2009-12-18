@@ -1,9 +1,12 @@
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "strerr.h"
 #include "exit.h"
 
 #define FATAL "maildirmake: fatal: "
 
-void main(argc,argv)
+int main(argc,argv)
 int argc;
 char **argv;
 {
@@ -20,5 +23,5 @@ char **argv;
     strerr_die4sys(111,FATAL,"unable to mkdir ",argv[1],"/new: ");
   if (mkdir("cur",0700) == -1)
     strerr_die4sys(111,FATAL,"unable to mkdir ",argv[1],"/cur: ");
-  _exit(0);
+  return 0;
 }

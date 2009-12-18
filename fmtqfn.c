@@ -4,7 +4,7 @@
 
 unsigned int fmtqfn(s,dirslash,id,flagsplit)
 char *s;
-char *dirslash;
+const char *dirslash;
 unsigned long id;
 int flagsplit;
 {
