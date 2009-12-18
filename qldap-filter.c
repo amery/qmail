@@ -47,6 +47,8 @@ filter_escape(char *s)
 {
 	char	x;
 
+	if( !(s && *s) ) return 0;
+
 	/* pre reserve some space */
 	if (!stralloc_ready(&escapedstr, str_len(s))) return 0;
 	if (!stralloc_copys(&escapedstr, "")) return 0;
@@ -58,6 +60,35 @@ filter_escape(char *s)
 	} while (*s++);
 	return escapedstr.s;
 }
+
+#ifdef DOMAIN_ALIAS
+/* Returns a modified mail string if an alias_domain-real_domain mapping is found
+ * It simply returns its argument if no mapping is found
+ * On error returns NULL
+ * */
+char*
+replace_domain(const char* mail)
+{
+	static stralloc	new_mail = {0};
+	unsigned int	at;
+	char*		new_domain;
+
+	at = str_rchr(mail, '@');
+        if (mail[at] != '@') 
+		return (char*) 0;
+	
+	if (new_domain=qldap_domain_alias(mail + at + 1)) { 
+		if(!stralloc_copyb(&new_mail,mail,at + 1))
+			return (char*) 0;
+		if(!stralloc_cats(&new_mail,new_domain))
+			return (char*) 0;
+		if(!stralloc_0(&new_mail))
+			return (char*) 0;
+		return new_mail.s;	
+	}
+	return (char*) mail; /* Do nothing */
+}
+#endif
 
 static stralloc ocfilter = {0};
 extern stralloc	objectclass;
@@ -122,7 +153,11 @@ filter_mail(char *mail, int *done)
 	}
 
 	if (len == 0) {
+#ifdef DOMAIN_ALIAS
+		escaped = filter_escape(replace_domain(mail));
+#else
 		escaped = filter_escape(mail);
+#endif
 		if (escaped == (char *)0) return 0;
 		len = str_len(escaped);
 		at = str_rchr(escaped, '@');

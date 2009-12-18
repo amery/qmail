@@ -111,4 +111,6 @@ char *filter_objectclass(char *);
 char *filter_uid(char *);
 char *filter_mail(char *, int *);
 int filter_mail_ext(void);
+
+char *qldap_domain_alias(const char*);
 #endif

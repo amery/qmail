@@ -52,6 +52,10 @@
 
 #include "qldap.h"
 
+#ifdef DOMAIN_ALIAS
+#include "constmap.h"
+#endif
+
 struct qldap {
 	int		state;
 #define NEW	0
@@ -81,6 +85,9 @@ unsigned int	default_uid = 0;
 unsigned int	default_gid = 0;
 unsigned long	quotasize = 0;
 unsigned long	quotacount = 0;
+#ifdef DOMAIN_ALIAS
+stralloc	domain_map_file = {0};
+#endif
 
 
 static  int qldap_close(qldap *);
@@ -210,6 +217,10 @@ qldap_ctrl_generic(void)
 		return -1;
 	logit(64, "init_ldap: control/defaultquotasize: %u\n", quotasize);
 	logit(64, "init_ldap: control/defaultquotacount: %u\n", quotacount);
+#ifdef DOMAIN_ALIAS
+	if (control_readfile(&domain_map_file, "control/aliasdomains", 0) == -1)
+		return -1;
+#endif
 
 	return 0;
 }
@@ -1054,4 +1065,34 @@ check_next_state(qldap *q, int next)
 		return 0;
 	}
 }
+
+#ifdef DOMAIN_ALIAS
+/* Look up real domain based on alias domain name
+ * Returns NULL, if no such mapping found (for real domains, for example)
+ * Returns a static (char*) real_domain otherwise
+ * Caller must issue read_controls(...,qldap_ctrl_generic,...) BEFORE 
+ *   in order to properly initialize domain_map_file
+ * */
+char*
+qldap_domain_alias(const char* alias_domain)
+{
+	const char*	mapping;
+	static stralloc	real = {0};
+	struct constmap	domain_map;
+
+	/* caller must have issued read_controls(...,qldap_ctrl_generic,...) */
+	if(!constmap_init(&domain_map,domain_map_file.s,domain_map_file.len,1))
+		return 0;
+	mapping = constmap(&domain_map,alias_domain,str_len(alias_domain));
+
+	if(mapping && *mapping) {
+		if(!stralloc_copys(&real,mapping))
+			return 0;
+		if(!stralloc_0(&real))
+			return 0;
+		return real.s;
+	}
+	return 0;
+}
+#endif
 
